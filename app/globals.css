@@ -1,0 +1,110 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  @apply bg-hero-gradient text-slate-800 antialiased;
+}
+
+::selection {
+  @apply bg-blue-200 text-blue-900;
+}
+
+/* ── Elegant floating keyframes ────────────────────────────────── */
+@keyframes floatGentle {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  50% {
+    transform: translateY(-6px) translateX(2px);
+  }
+}
+
+@keyframes floatGentleAlt {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  33% {
+    transform: translateY(-4px) translateX(-2px);
+  }
+  66% {
+    transform: translateY(2px) translateX(3px);
+  }
+}
+
+@keyframes scanPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Utility classes ───────────────────────────────────────────── */
+.animate-float-gentle {
+  animation: floatGentle 18s ease-in-out infinite;
+}
+.animate-float-gentle-alt {
+  animation: floatGentleAlt 22s ease-in-out infinite;
+}
+.animate-scan-pulse {
+  animation: scanPulse 3s ease-in-out infinite;
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Noise texture overlay for glassmorphism realism ───────────── */
+.noise-texture {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='150' height='150' filter='url(%23n)' opacity='.3'/%3E%3C/svg%3E");
+}
+
+/* ── Glassmorphism panel base ──────────────────────────────────── */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 32px rgba(37, 99, 235, 0.1),
+    0 2px 8px rgba(37, 99, 235, 0.06);
+}
+
+/* ── Login card elevated glass ─────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(32px) saturate(1.5);
+  -webkit-backdrop-filter: blur(32px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 20px 60px rgba(37, 99, 235, 0.12),
+    0 4px 16px rgba(37, 99, 235, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
