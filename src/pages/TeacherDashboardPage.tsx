@@ -1,9 +1,16 @@
+﻿import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import DemoBackground from "../components/demo/DemoBackground";
 import DemoGlassCard from "../components/demo/DemoGlassCard";
 import StatusBadge from "../components/demo/StatusBadge";
 import TeacherReviewModal from "../components/demo/TeacherReviewModal";
 import type { TeacherSubmission } from "../components/demo/types";
+import {
+  BUTTON_INTERACTIVE_CLASS,
+  GLASS_INTERACTIVE_CLASS,
+  INPUT_GLOW_CLASS,
+  LIST_ROW_INTERACTIVE_CLASS,
+} from "../components/ui/glass";
 
 const SIDEBAR_ITEMS = ["Dashboard", "Submissions", "AI Reports"];
 
@@ -354,17 +361,50 @@ function riskFromPercent(percent: number) {
   return "Low";
 }
 
+type StatusFilter = "All" | "Under Review" | "Completed";
+type SortOrder = "Newest" | "Oldest";
+
+function statusLabel(status: TeacherSubmission["status"]) {
+  if (status === "Reviewed") return "Completed";
+  return status;
+}
+
+function riskPillClass(risk: ReturnType<typeof riskFromPercent>) {
+  if (risk === "High") return "border-rose-200/90 bg-rose-50/80 text-rose-700";
+  if (risk === "Medium") return "border-amber-200/90 bg-amber-50/80 text-amber-700";
+  return "border-emerald-200/90 bg-emerald-50/80 text-emerald-700";
+}
+
 export default function TeacherDashboardPage() {
   const [activeItem, setActiveItem] = useState("Dashboard");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("Newest");
+  const [statusOverrides, setStatusOverrides] = useState<
+    Partial<Record<string, TeacherSubmission["status"]>>
+  >({});
   const [selectedSubmission, setSelectedSubmission] = useState<TeacherSubmission | null>(
     null,
   );
 
+  const getEffectiveStatus = (submission: TeacherSubmission) =>
+    statusOverrides[submission.id] ?? submission.status;
+
   const filteredSubmissions = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return MOCK_SUBMISSIONS;
-    return MOCK_SUBMISSIONS.filter((submission) => {
+    let current = MOCK_SUBMISSIONS.filter((submission) => {
+      const effectiveStatus = getEffectiveStatus(submission);
+
+      const statusMatches =
+        statusFilter === "All"
+          ? true
+          : statusFilter === "Completed"
+            ? effectiveStatus === "Reviewed"
+            : effectiveStatus === "Under Review";
+
+      if (!statusMatches) return false;
+      if (!query) return true;
+
       return (
         submission.studentName.toLowerCase().includes(query) ||
         submission.projectTitle.toLowerCase().includes(query) ||
@@ -372,21 +412,36 @@ export default function TeacherDashboardPage() {
         submission.branch.toLowerCase().includes(query)
       );
     });
-  }, [search]);
+
+    if (sortOrder === "Oldest") {
+      current = [...current].reverse();
+    }
+
+    return current;
+  }, [search, sortOrder, statusFilter, statusOverrides]);
 
   const totalSubmissions = MOCK_SUBMISSIONS.length;
-  const flaggedCount = MOCK_SUBMISSIONS.filter((item) => item.status === "Flagged").length;
+  const flaggedCount = MOCK_SUBMISSIONS.filter(
+    (item) => getEffectiveStatus(item) === "Flagged",
+  ).length;
   const avgPlagiarism = Math.round(
     MOCK_SUBMISSIONS.reduce((sum, item) => sum + item.plagiarismPercent, 0) /
       totalSubmissions,
   );
-  const recentSubmission = MOCK_SUBMISSIONS[0];
+  const recentSubmission = filteredSubmissions[0] ?? MOCK_SUBMISSIONS[0];
+
+  const markCompleted = (submissionId: string) => {
+    setStatusOverrides((current) => ({
+      ...current,
+      [submissionId]: "Reviewed",
+    }));
+  };
 
   return (
     <DemoBackground>
       <div className="mx-auto flex min-h-screen w-full max-w-[1380px] gap-4 px-4 py-6 sm:px-8">
         <aside className="hidden w-64 shrink-0 lg:block">
-          <DemoGlassCard className="sticky top-6 p-4">
+          <DemoGlassCard className={`sticky top-6 p-4 ${GLASS_INTERACTIVE_CLASS}`}>
             <p className="mb-4 px-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               Teacher Panel
             </p>
@@ -413,23 +468,41 @@ export default function TeacherDashboardPage() {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <DemoGlassCard className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <DemoGlassCard className={`p-4 ${GLASS_INTERACTIVE_CLASS}`}>
             <div>
               <h1 className="text-xl font-semibold text-slate-900">Teacher Dashboard</h1>
               <p className="text-sm text-slate-600">
                 Review submissions, plagiarism reports, and viva recommendations.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search student, roll no, project..."
-                className="w-[260px] max-w-full rounded-xl border border-white/65 bg-white/55 px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-200 focus:bg-white/75"
+                className={`w-[250px] max-w-full rounded-xl border border-white/65 bg-white/55 px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-200 focus:bg-white/75 ${INPUT_GLOW_CLASS}`}
               />
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                className={`rounded-xl border border-white/65 bg-white/55 px-3 py-2 text-sm text-slate-700 outline-none ${INPUT_GLOW_CLASS}`}
+              >
+                <option>All</option>
+                <option>Under Review</option>
+                <option>Completed</option>
+              </select>
               <button
                 type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/60 text-sm font-semibold text-slate-700 transition hover:bg-white/80"
+                onClick={() =>
+                  setSortOrder((current) => (current === "Newest" ? "Oldest" : "Newest"))
+                }
+                className={`rounded-xl border border-white/70 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white/80 ${BUTTON_INTERACTIVE_CLASS}`}
+              >
+                {sortOrder}
+              </button>
+              <button
+                type="button"
+                className={`flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/60 text-sm font-semibold text-slate-700 transition hover:bg-white/80 ${BUTTON_INTERACTIVE_CLASS}`}
                 aria-label="Profile"
               >
                 TS
@@ -437,28 +510,32 @@ export default function TeacherDashboardPage() {
             </div>
           </DemoGlassCard>
 
-          <section className="grid gap-4 xl:grid-cols-2">
-            <DemoGlassCard className="p-5">
+          <motion.section
+            className="grid gap-4 xl:grid-cols-2"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28 }}
+          >
+            <DemoGlassCard className={`p-5 ${GLASS_INTERACTIVE_CLASS}`}>
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
                   Recent Submission
                 </h2>
                 <StatusBadge
-                  label={recentSubmission.status}
-                  tone={statusTone(recentSubmission.status)}
+                  label={statusLabel(getEffectiveStatus(recentSubmission))}
+                  tone={statusTone(getEffectiveStatus(recentSubmission))}
                 />
               </div>
               <p className="mt-3 text-lg font-semibold text-slate-900">
                 {recentSubmission.projectTitle}
               </p>
               <p className="mt-1 text-sm text-slate-700">
-                {recentSubmission.studentName} ({recentSubmission.rollNo}) ·{" "}
-                {recentSubmission.branch}
+                {recentSubmission.studentName} ({recentSubmission.rollNo}) - {recentSubmission.branch}
               </p>
               <p className="mt-2 text-xs text-slate-500">{recentSubmission.submittedAt}</p>
             </DemoGlassCard>
 
-            <DemoGlassCard className="p-5">
+            <DemoGlassCard className={`p-5 ${GLASS_INTERACTIVE_CLASS}`}>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
                 Plagiarism Report Summary
               </h2>
@@ -472,9 +549,7 @@ export default function TeacherDashboardPage() {
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl border border-white/60 bg-white/40 p-3">
                   <p className="text-xs text-slate-500">Total Submissions</p>
-                  <p className="mt-1 text-lg font-semibold text-slate-800">
-                    {totalSubmissions}
-                  </p>
+                  <p className="mt-1 text-lg font-semibold text-slate-800">{totalSubmissions}</p>
                 </div>
                 <div className="rounded-xl border border-white/60 bg-white/40 p-3">
                   <p className="text-xs text-slate-500">Flagged Cases</p>
@@ -482,63 +557,105 @@ export default function TeacherDashboardPage() {
                 </div>
               </div>
             </DemoGlassCard>
-          </section>
+          </motion.section>
 
-          <DemoGlassCard className="overflow-hidden">
-            <div className="border-b border-white/45 px-5 py-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-                Submissions
-              </h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-white/35 text-xs uppercase tracking-wide text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Student Name</th>
-                    <th className="px-4 py-3 font-semibold">Roll No</th>
-                    <th className="px-4 py-3 font-semibold">Branch</th>
-                    <th className="px-4 py-3 font-semibold">Project Title</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Plagiarism %</th>
-                    <th className="px-4 py-3 font-semibold">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSubmissions.map((submission) => (
-                    <tr
-                      key={submission.id}
-                      className="border-t border-white/35 text-slate-700 transition hover:bg-white/30"
-                    >
-                      <td className="whitespace-nowrap px-4 py-3 font-medium">
-                        {submission.studentName}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">{submission.rollNo}</td>
-                      <td className="whitespace-nowrap px-4 py-3">{submission.branch}</td>
-                      <td className="min-w-[220px] px-4 py-3">{submission.projectTitle}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <StatusBadge
-                          label={submission.status}
-                          tone={statusTone(submission.status)}
-                        />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-semibold">
-                        {submission.plagiarismPercent}%
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSubmission(submission)}
-                          className="rounded-lg border border-blue-200/75 bg-blue-50/75 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100/85"
-                        >
-                          View
-                        </button>
-                      </td>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.06 }}
+          >
+            <DemoGlassCard className={`overflow-hidden ${GLASS_INTERACTIVE_CLASS}`}>
+              <div className="border-b border-white/45 px-5 py-4">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+                  Submissions
+                </h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-white/35 text-xs uppercase tracking-wide text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Student Name</th>
+                      <th className="px-4 py-3 font-semibold">Roll No</th>
+                      <th className="px-4 py-3 font-semibold">Branch</th>
+                      <th className="px-4 py-3 font-semibold">Project Title</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 font-semibold">Risk</th>
+                      <th className="px-4 py-3 font-semibold">Plagiarism %</th>
+                      <th className="px-4 py-3 font-semibold">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </DemoGlassCard>
+                  </thead>
+                  <tbody>
+                    {filteredSubmissions.map((submission) => {
+                      const effectiveStatus = getEffectiveStatus(submission);
+                      const risk = riskFromPercent(submission.plagiarismPercent);
+                      const canMarkCompleted = effectiveStatus !== "Reviewed";
+
+                      return (
+                        <tr
+                          key={submission.id}
+                          className={`group border-t border-white/35 text-slate-700 ${LIST_ROW_INTERACTIVE_CLASS}`}
+                        >
+                          <td className="whitespace-nowrap px-4 py-3 font-medium">
+                            {submission.studentName}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">{submission.rollNo}</td>
+                          <td className="whitespace-nowrap px-4 py-3">{submission.branch}</td>
+                          <td className="min-w-[220px] px-4 py-3">{submission.projectTitle}</td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <StatusBadge
+                              label={statusLabel(effectiveStatus)}
+                              tone={statusTone(effectiveStatus)}
+                            />
+                            {effectiveStatus === "Under Review" ? (
+                              <div className="mt-2 h-1.5 w-24 overflow-hidden rounded-full bg-blue-100/70">
+                                <motion.div
+                                  className="h-full rounded-full bg-gradient-to-r from-blue-500/85 to-cyan-500/85"
+                                  initial={{ x: "-90%" }}
+                                  animate={{ x: "100%" }}
+                                  transition={{ repeat: Infinity, duration: 1.6, ease: "linear" }}
+                                />
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${riskPillClass(
+                                risk,
+                              )}`}
+                            >
+                              {risk}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                            {submission.plagiarismPercent}%
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <div className="flex items-center gap-2 opacity-75 transition group-hover:opacity-100">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSubmission(submission)}
+                                className={`rounded-lg border border-blue-200/75 bg-blue-50/75 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100/85 ${BUTTON_INTERACTIVE_CLASS}`}
+                              >
+                                View
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!canMarkCompleted}
+                                onClick={() => markCompleted(submission.id)}
+                                className={`rounded-lg border border-emerald-200/75 bg-emerald-50/75 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100/85 disabled:cursor-not-allowed disabled:opacity-60 ${BUTTON_INTERACTIVE_CLASS}`}
+                              >
+                                Mark Completed
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </DemoGlassCard>
+          </motion.div>
         </div>
       </div>
 

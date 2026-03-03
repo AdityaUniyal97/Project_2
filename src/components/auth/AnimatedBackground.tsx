@@ -59,34 +59,45 @@ const AnimatedBackground = memo(function AnimatedBackground({ parallax }: Props)
 
   return (
     <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#e6effd] via-[#ecf3ff] to-[#f0f4fb]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#f3f5f8] via-[#f8fafc] to-[#edf1f5]" />
 
       <div
-        className="absolute -left-[14%] -top-[8%] h-[75vh] w-[75vw] rounded-full opacity-65"
+        className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle, rgba(175,210,255,0.5) 0%, rgba(215,230,255,0.18) 50%, transparent 80%)",
-        }}
-      />
-      <div
-        className="absolute left-[18%] top-[22%] h-[65vh] w-[65vw] rounded-full opacity-50"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(195,220,255,0.38) 0%, rgba(225,240,255,0.12) 55%, transparent 80%)",
-        }}
-      />
-      <div
-        className="absolute -bottom-[8%] -right-[8%] h-[55vh] w-[55vw] rounded-full opacity-40"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(185,215,255,0.42) 0%, rgba(220,235,255,0.1) 60%, transparent 85%)",
+            "radial-gradient(circle at 52% 38%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.45) 42%, transparent 78%)",
         }}
       />
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at center, transparent 50%, rgba(200,215,240,0.32) 100%)",
+            "linear-gradient(128deg, rgba(255,255,255,0.62) 0%, rgba(226,232,240,0.22) 52%, rgba(2,6,23,0.1) 100%)",
+        }}
+      />
+      <div
+        className="absolute -right-[6%] top-1/2 h-[52vh] w-[40vw] min-w-[320px] -translate-y-1/2 rounded-full opacity-45 blur-[80px]"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(15,23,42,0.2) 0%, rgba(15,23,42,0.07) 44%, transparent 76%)",
+        }}
+      />
+      <div
+        className="absolute -left-[16%] top-[18%] h-[62vh] w-[58vw] rounded-full opacity-30 blur-[86px]"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(15,23,42,0.14) 0%, rgba(15,23,42,0.04) 48%, transparent 78%)",
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(circle at 0% 0%, rgba(2,6,23,0.12) 0%, transparent 36%),
+            radial-gradient(circle at 100% 0%, rgba(2,6,23,0.1) 0%, transparent 34%),
+            radial-gradient(circle at 100% 100%, rgba(2,6,23,0.13) 0%, transparent 38%),
+            radial-gradient(circle at 0% 100%, rgba(2,6,23,0.12) 0%, transparent 36%)
+          `,
         }}
       />
 

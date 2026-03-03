@@ -16,7 +16,7 @@ export default function TopNav({ authMode, onAuthClick }: Props) {
           <button
             key={label}
             type="button"
-            className="text-[14px] font-medium text-slate-500 transition-colors hover:text-slate-800"
+            className="text-[14px] font-medium text-slate-700 transition-colors hover:text-slate-900"
           >
             {label}
           </button>

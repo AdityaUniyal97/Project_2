@@ -1,4 +1,5 @@
 import type { HTMLAttributes } from "react";
+import { GLASS_EDGE_CLASS, GLASS_PANEL_CLASS } from "../ui/glass";
 
 function joinClasses(...classes: Array<string | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -12,7 +13,8 @@ export default function DemoGlassCard({
     <div
       {...props}
       className={joinClasses(
-        "rounded-3xl border border-white/40 bg-white/30 shadow-[0_25px_70px_rgba(29,78,216,0.09)] backdrop-blur-2xl",
+        GLASS_PANEL_CLASS,
+        GLASS_EDGE_CLASS,
         className,
       )}
     />

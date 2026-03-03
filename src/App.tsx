@@ -11,6 +11,13 @@ export default function App() {
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden">
       <AnimatedBackground parallax={parallax} />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-[9] h-[180px]"
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(2,6,23,0.16) 0%, rgba(2,6,23,0.08) 38%, rgba(2,6,23,0) 100%)",
+        }}
+      />
 
       <TopNav
         authMode={authMode}
