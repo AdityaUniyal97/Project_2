@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: #f0f5ff;
+  color: #0f172a;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(96, 165, 250, 0.25);
+  color: #082744;
+}
+
+@keyframes scan-beam {
+  0% {
+    top: -4px;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.scan-beam {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(80, 180, 255, 0.3) 15%,
+    rgba(100, 200, 255, 0.65) 50%,
+    rgba(80, 180, 255, 0.3) 85%,
+    transparent 100%
+  );
+  box-shadow: 0 0 14px 5px rgba(100, 200, 255, 0.2);
+  animation: scan-beam 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes dust-float {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: var(--p-opacity);
+  }
+  50% {
+    transform: translate(calc(var(--drift-x) * 1px), -90px) scale(0.75);
+    opacity: calc(var(--p-opacity) * 0.45);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: var(--p-opacity);
+  }
+}
+
+.flip-perspective {
+  perspective: 1200px;
+}
+
+.flip-inner {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flip-back {
+  transform: rotateY(180deg);
+}
+
+.auth-glass-card {
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(240, 248, 255, 0.62) 100%
+  );
+  box-shadow:
+    0 28px 68px rgba(25, 70, 170, 0.07),
+    0 2px 6px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(30px) saturate(1.35);
+  -webkit-backdrop-filter: blur(30px) saturate(1.35);
+}
