@@ -1,189 +1,470 @@
 import type {
-  TeacherKpiStats,
+  StudentProfile,
+  Submission,
   TeacherRiskLevel,
-  TeacherStudentRecord,
-  TeacherSubmissionRecord,
+  TeacherSettingsState,
+  VivaQuestion,
+  VivaSubmissionState,
 } from "./types";
 
-export const TEACHER_SUBMISSIONS: TeacherSubmissionRecord[] = [
+function createVivaQuestions(baseId: string, topic: string): VivaQuestion[] {
+  return [
+    {
+      id: `${baseId}-v1`,
+      topicTag: topic,
+      difficulty: "Medium",
+      question: "Walk through your core design decisions for this module.",
+      expectedTalkingPoints: "Architecture choice, key tradeoffs, and why alternatives were rejected.",
+    },
+    {
+      id: `${baseId}-v2`,
+      topicTag: "Testing",
+      difficulty: "Easy",
+      question: "How did you validate correctness and edge cases?",
+      expectedTalkingPoints: "Test strategy, critical edge cases, and production monitoring checks.",
+    },
+    {
+      id: `${baseId}-v3`,
+      topicTag: "Security",
+      difficulty: "Hard",
+      question: "What are the top security risks in your current implementation?",
+      expectedTalkingPoints: "Threat model, attack surface, mitigation steps, and remaining risks.",
+    },
+  ];
+}
+
+export const TEACHER_SUBMISSIONS_SEED: Submission[] = [
   {
-    id: "T-001",
+    id: "SUB-001",
     studentName: "Aarav Mehta",
-    rollNo: "21CSE101",
+    rollNumber: "21CSE101",
     branch: "CSE",
     projectTitle: "Campus Connect Portal",
     submittedAt: "2026-03-03T10:20:00",
-    plagiarismPercent: 28,
-    originalityPercent: 72,
     status: "Under Review",
+    riskLevel: "MEDIUM",
+    originalityPercent: 72,
+    plagiarismPercent: 28,
+    structuralOverlapPercent: 31,
+    aiConfidencePercent: 79,
+    commitRiskScore: 4.2,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/campus-connect",
+    githubUrl: "https://github.com/demo/campus-connect",
+    summaryNarrative:
+      "Submission shows reasonable originality with moderate structural reuse in routing and dashboard modules.",
     detectedSources: [
-      { name: "GitHub Public Repo", similarity: 22 },
-      { name: "StackOverflow Snippets", similarity: 17 },
-      { name: "Medium Article", similarity: 11 },
+      { name: "GitHub Public Repo", percent: 22 },
+      { name: "StackOverflow Snippets", percent: 14 },
+      { name: "Medium Tutorial", percent: 9 },
     ],
-    vivaSuggestions: [
-      "Explain your role-based authorization model and why it is safe.",
-      "What trade-offs did you make while designing API pagination?",
-      "How does your system recover from failed webhook events?",
-    ],
+    vivaQuestions: createVivaQuestions("SUB-001", "Architecture"),
   },
   {
-    id: "T-002",
+    id: "SUB-002",
     studentName: "Diya Raman",
-    rollNo: "21IT119",
+    rollNumber: "21IT119",
     branch: "IT",
     projectTitle: "Smart Internship Tracker",
     submittedAt: "2026-03-02T18:35:00",
-    plagiarismPercent: 18,
-    originalityPercent: 82,
     status: "Completed",
+    riskLevel: "LOW",
+    originalityPercent: 84,
+    plagiarismPercent: 16,
+    structuralOverlapPercent: 19,
+    aiConfidencePercent: 88,
+    commitRiskScore: 2.9,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/internship-tracker",
+    githubUrl: "https://github.com/demo/internship-tracker",
+    summaryNarrative:
+      "Strong originality and healthy commit history. Similarity appears mostly from framework boilerplate.",
     detectedSources: [
-      { name: "GitHub Public Repo", similarity: 13 },
-      { name: "Official Docs", similarity: 8 },
-      { name: "Tutorial Blog", similarity: 6 },
+      { name: "Official Docs", percent: 8 },
+      { name: "GitHub Public Repo", percent: 7 },
+      { name: "Tutorial Blog", percent: 5 },
     ],
-    vivaSuggestions: [
-      "How is recommendation ranking tuned for fairness?",
-      "What metrics did you use to evaluate tracker quality?",
-      "How does your cache invalidation strategy work?",
-    ],
+    vivaQuestions: createVivaQuestions("SUB-002", "Data Modeling"),
   },
   {
-    id: "T-003",
+    id: "SUB-003",
     studentName: "Ishaan Patel",
-    rollNo: "21AIML077",
+    rollNumber: "21AIML077",
     branch: "AIML",
     projectTitle: "Code Similarity Inspector",
     submittedAt: "2026-03-01T16:40:00",
-    plagiarismPercent: 67,
-    originalityPercent: 33,
     status: "Under Review",
+    riskLevel: "CRITICAL",
+    originalityPercent: 29,
+    plagiarismPercent: 71,
+    structuralOverlapPercent: 76,
+    aiConfidencePercent: 93,
+    commitRiskScore: 9.1,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/code-similarity",
+    githubUrl: "https://github.com/demo/code-similarity",
+    summaryNarrative:
+      "High overlap across core scoring pipeline and nearly identical folder structure versus known public references.",
     detectedSources: [
-      { name: "GitHub Public Repo", similarity: 34 },
-      { name: "Kaggle Notebook", similarity: 21 },
-      { name: "GeeksforGeeks", similarity: 12 },
+      { name: "GitHub Public Repo", percent: 36 },
+      { name: "Kaggle Notebook", percent: 23 },
+      { name: "GeeksforGeeks", percent: 12 },
     ],
-    vivaSuggestions: [
-      "Why did you choose semantic vectors over token-only matching?",
-      "How do you reduce false positives for short code files?",
-      "What benchmark did you use to validate your threshold values?",
-    ],
+    vivaQuestions: createVivaQuestions("SUB-003", "ML Pipeline"),
   },
   {
-    id: "T-004",
+    id: "SUB-004",
     studentName: "Riya Nair",
-    rollNo: "21CSE112",
+    rollNumber: "21CSE112",
     branch: "CSE",
     projectTitle: "Hostel Complaint Resolver",
     submittedAt: "2026-02-28T15:16:00",
-    plagiarismPercent: 35,
-    originalityPercent: 65,
     status: "Under Review",
+    riskLevel: "MEDIUM",
+    originalityPercent: 63,
+    plagiarismPercent: 37,
+    structuralOverlapPercent: 42,
+    aiConfidencePercent: 74,
+    commitRiskScore: 5.1,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/hostel-resolver",
+    githubUrl: "https://github.com/demo/hostel-resolver",
+    summaryNarrative:
+      "Moderate overlap in utility layer and UI sections; business workflow logic appears partially unique.",
     detectedSources: [
-      { name: "GitHub Public Repo", similarity: 19 },
-      { name: "StackOverflow Snippets", similarity: 10 },
-      { name: "Community Forum", similarity: 9 },
+      { name: "GitHub Public Repo", percent: 19 },
+      { name: "Community Forum", percent: 11 },
+      { name: "StackOverflow Snippets", percent: 9 },
     ],
-    vivaSuggestions: [
-      "How are complaint priorities assigned in your workflow?",
-      "What SLA handling logic do you use for missed deadlines?",
-      "How do you keep audit logs tamper-resistant?",
-    ],
+    vivaQuestions: createVivaQuestions("SUB-004", "Workflow"),
   },
   {
-    id: "T-005",
+    id: "SUB-005",
     studentName: "Neeraj Iyer",
-    rollNo: "21ECE062",
+    rollNumber: "21ECE062",
     branch: "ECE",
     projectTitle: "IoT Attendance Beacon",
     submittedAt: "2026-02-27T12:02:00",
-    plagiarismPercent: 24,
-    originalityPercent: 76,
     status: "Completed",
+    riskLevel: "LOW",
+    originalityPercent: 77,
+    plagiarismPercent: 23,
+    structuralOverlapPercent: 24,
+    aiConfidencePercent: 82,
+    commitRiskScore: 3.8,
+    projectType: "mobile",
+    liveDemoUrl: "https://example.org/iot-attendance",
+    githubUrl: "https://github.com/demo/iot-attendance",
+    summaryNarrative:
+      "Implementation appears original with expected reuse of SDK docs and sample BLE handling patterns.",
     detectedSources: [
-      { name: "Hardware Forum", similarity: 14 },
-      { name: "Vendor SDK Docs", similarity: 9 },
-      { name: "GitHub Public Repo", similarity: 7 },
+      { name: "Vendor SDK Docs", percent: 11 },
+      { name: "Hardware Forum", percent: 8 },
+      { name: "GitHub Public Repo", percent: 6 },
     ],
-    vivaSuggestions: [
-      "How do you secure IoT device provisioning and key exchange?",
-      "What fallback path handles weak BLE signal quality?",
-      "How did you test battery life assumptions?",
-    ],
+    vivaQuestions: createVivaQuestions("SUB-005", "IoT"),
   },
   {
-    id: "T-006",
+    id: "SUB-006",
     studentName: "Kritika Shah",
-    rollNo: "21IT125",
+    rollNumber: "21IT125",
     branch: "IT",
     projectTitle: "Faculty Workload Planner",
     submittedAt: "2026-02-25T18:42:00",
-    plagiarismPercent: 41,
-    originalityPercent: 59,
     status: "Under Review",
+    riskLevel: "HIGH",
+    originalityPercent: 47,
+    plagiarismPercent: 53,
+    structuralOverlapPercent: 58,
+    aiConfidencePercent: 86,
+    commitRiskScore: 7.5,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/workload-planner",
+    githubUrl: "https://github.com/demo/workload-planner",
+    summaryNarrative:
+      "Scheduling algorithm and conflict resolution logic are close to public implementations; needs viva validation.",
     detectedSources: [
-      { name: "Research Paper", similarity: 16 },
-      { name: "GitHub Public Repo", similarity: 14 },
-      { name: "StackOverflow Snippets", similarity: 11 },
+      { name: "Research Paper", percent: 18 },
+      { name: "GitHub Public Repo", percent: 17 },
+      { name: "StackOverflow Snippets", percent: 12 },
     ],
-    vivaSuggestions: [
-      "How does your planner resolve timetable conflicts deterministically?",
-      "Which fairness metric balances faculty load distribution?",
-      "What edge cases break your current allocation algorithm?",
-    ],
+    vivaQuestions: createVivaQuestions("SUB-006", "Optimization"),
   },
   {
-    id: "T-007",
+    id: "SUB-007",
     studentName: "Yash Verma",
-    rollNo: "21AIML081",
+    rollNumber: "21AIML081",
     branch: "AIML",
     projectTitle: "Resume Screening Assistant",
     submittedAt: "2026-02-24T14:28:00",
-    plagiarismPercent: 63,
-    originalityPercent: 37,
     status: "Under Review",
+    riskLevel: "HIGH",
+    originalityPercent: 39,
+    plagiarismPercent: 61,
+    structuralOverlapPercent: 66,
+    aiConfidencePercent: 90,
+    commitRiskScore: 8.0,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/resume-screening",
+    githubUrl: "https://github.com/demo/resume-screening",
+    summaryNarrative:
+      "Strong evidence of copied model-serving and ranking flow. Explainability layer appears minimally adapted.",
     detectedSources: [
-      { name: "GitHub Public Repo", similarity: 31 },
-      { name: "Towards Data Science", similarity: 18 },
-      { name: "Tutorial Blog", similarity: 12 },
+      { name: "GitHub Public Repo", percent: 33 },
+      { name: "Towards Data Science", percent: 16 },
+      { name: "Tutorial Blog", percent: 11 },
     ],
-    vivaSuggestions: [
-      "How do you audit fairness across candidate profiles?",
-      "What leakage risks exist between train and test sets?",
-      "How do you explain low-confidence ranking outcomes?",
-    ],
+    vivaQuestions: createVivaQuestions("SUB-007", "Fairness"),
   },
   {
-    id: "T-008",
+    id: "SUB-008",
     studentName: "Manvi Rao",
-    rollNo: "21CSE133",
+    rollNumber: "21CSE133",
     branch: "CSE",
     projectTitle: "E-Library Recommendation Engine",
     submittedAt: "2026-02-21T11:09:00",
-    plagiarismPercent: 16,
-    originalityPercent: 84,
     status: "Completed",
+    riskLevel: "LOW",
+    originalityPercent: 87,
+    plagiarismPercent: 13,
+    structuralOverlapPercent: 15,
+    aiConfidencePercent: 84,
+    commitRiskScore: 2.1,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/e-library",
+    githubUrl: "https://github.com/demo/e-library",
+    summaryNarrative:
+      "Healthy originality profile with small external overlap mainly in API integration and UI scaffolding.",
     detectedSources: [
-      { name: "Open Library API Docs", similarity: 10 },
-      { name: "GitHub Public Repo", similarity: 9 },
-      { name: "Official Docs", similarity: 7 },
+      { name: "Open Library Docs", percent: 7 },
+      { name: "Official Docs", percent: 6 },
+      { name: "GitHub Public Repo", percent: 5 },
     ],
-    vivaSuggestions: [
-      "How do you handle cold-start recommendation challenges?",
-      "What feedback signals are weighted in your ranking pipeline?",
-      "How do you monitor model drift over time?",
+    vivaQuestions: createVivaQuestions("SUB-008", "Recommendations"),
+  },
+  {
+    id: "SUB-009",
+    studentName: "Arjun Sethi",
+    rollNumber: "21ME057",
+    branch: "MECH",
+    projectTitle: "Workshop Inventory Manager",
+    submittedAt: "2026-02-20T17:10:00",
+    status: "Under Review",
+    riskLevel: "MEDIUM",
+    originalityPercent: 69,
+    plagiarismPercent: 31,
+    structuralOverlapPercent: 35,
+    aiConfidencePercent: 72,
+    commitRiskScore: 4.8,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/workshop-inventory",
+    githubUrl: "https://github.com/demo/workshop-inventory",
+    summaryNarrative:
+      "Mostly original domain flow with medium overlap in inventory table and CRUD handlers.",
+    detectedSources: [
+      { name: "GitHub Public Repo", percent: 15 },
+      { name: "Vendor Docs", percent: 9 },
+      { name: "Forum Thread", percent: 7 },
     ],
+    vivaQuestions: createVivaQuestions("SUB-009", "State Management"),
+  },
+  {
+    id: "SUB-010",
+    studentName: "Sana Qureshi",
+    rollNumber: "21EEE048",
+    branch: "EEE",
+    projectTitle: "Energy Meter Insights",
+    submittedAt: "2026-02-18T09:28:00",
+    status: "Completed",
+    riskLevel: "LOW",
+    originalityPercent: 79,
+    plagiarismPercent: 21,
+    structuralOverlapPercent: 23,
+    aiConfidencePercent: 81,
+    commitRiskScore: 3.2,
+    projectType: "mobile",
+    liveDemoUrl: "https://example.org/energy-insights",
+    githubUrl: "https://github.com/demo/energy-insights",
+    summaryNarrative:
+      "Originality remains healthy; shared snippets are mostly telemetry parsing and chart helpers.",
+    detectedSources: [
+      { name: "Open Source Docs", percent: 10 },
+      { name: "GitHub Public Repo", percent: 7 },
+      { name: "Engineering Blog", percent: 4 },
+    ],
+    vivaQuestions: createVivaQuestions("SUB-010", "Analytics"),
+  },
+  {
+    id: "SUB-011",
+    studentName: "Pranav Kulkarni",
+    rollNumber: "21IT141",
+    branch: "IT",
+    projectTitle: "Placement Analytics Hub",
+    submittedAt: "2026-02-16T13:47:00",
+    status: "Under Review",
+    riskLevel: "HIGH",
+    originalityPercent: 44,
+    plagiarismPercent: 56,
+    structuralOverlapPercent: 61,
+    aiConfidencePercent: 87,
+    commitRiskScore: 7.9,
+    projectType: "web",
+    liveDemoUrl: "https://example.org/placement-analytics",
+    githubUrl: "https://github.com/demo/placement-analytics",
+    summaryNarrative:
+      "Model training and scoring pipeline aligns strongly with available templates and requires viva explanation.",
+    detectedSources: [
+      { name: "Kaggle Notebook", percent: 21 },
+      { name: "GitHub Public Repo", percent: 19 },
+      { name: "StackOverflow Snippets", percent: 10 },
+    ],
+    vivaQuestions: createVivaQuestions("SUB-011", "Data Science"),
+  },
+  {
+    id: "SUB-012",
+    studentName: "Tanvi Chopra",
+    rollNumber: "21CSE147",
+    branch: "CSE",
+    projectTitle: "Remote Lab Simulator",
+    submittedAt: "2026-02-14T11:15:00",
+    status: "Under Review",
+    riskLevel: "CRITICAL",
+    originalityPercent: 24,
+    plagiarismPercent: 76,
+    structuralOverlapPercent: 81,
+    aiConfidencePercent: 95,
+    commitRiskScore: 9.6,
+    projectType: "cli",
+    liveDemoUrl: "https://example.org/remote-lab",
+    githubUrl: "https://github.com/demo/remote-lab",
+    summaryNarrative:
+      "Critical risk: heavy overlap in simulation engine and orchestration logic with minimal contextual adaptation.",
+    detectedSources: [
+      { name: "GitHub Public Repo", percent: 38 },
+      { name: "Tutorial Blog", percent: 22 },
+      { name: "YouTube Walkthrough", percent: 14 },
+    ],
+    vivaQuestions: createVivaQuestions("SUB-012", "Systems"),
   },
 ];
 
-export const OVERVIEW_SPARKLINES = {
-  total: [2, 3, 4, 4, 5, 6],
-  underReview: [1, 2, 2, 3, 3, 4],
-  completed: [1, 1, 2, 2, 3, 3],
-  highRisk: [0, 1, 1, 2, 2, 2],
-} as const;
+export const DEFAULT_TEACHER_SETTINGS: TeacherSettingsState = {
+  autoAnalysis: true,
+  strictMode: false,
+  vivaRequiredForHighRisk: true,
+  similarityThreshold: 62,
+  confidenceThreshold: 74,
+};
 
-export function toSparklinePoints(values: number[], width = 90, height = 28) {
+export function sortBySubmittedDesc(submissions: Submission[]) {
+  return [...submissions].sort(
+    (left, right) => new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime(),
+  );
+}
+
+export function sortBySubmittedAsc(submissions: Submission[]) {
+  return [...submissions].sort(
+    (left, right) => new Date(left.submittedAt).getTime() - new Date(right.submittedAt).getTime(),
+  );
+}
+
+export function toReadableDate(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+}
+
+export function riskWeight(level: TeacherRiskLevel) {
+  if (level === "CRITICAL") return 4;
+  if (level === "HIGH") return 3;
+  if (level === "MEDIUM") return 2;
+  return 1;
+}
+
+export function deriveStudentProfiles(submissions: Submission[]): StudentProfile[] {
+  const grouped = new Map<string, Submission[]>();
+
+  submissions.forEach((submission) => {
+    const current = grouped.get(submission.rollNumber) ?? [];
+    grouped.set(submission.rollNumber, [...current, submission]);
+  });
+
+  return Array.from(grouped.entries())
+    .map(([rollNumber, items]) => {
+      const sorted = sortBySubmittedAsc(items);
+      const avgOriginality = Math.round(
+        sorted.reduce((sum, item) => sum + item.originalityPercent, 0) / sorted.length,
+      );
+
+      return {
+        id: `STU-${rollNumber}`,
+        studentName: sorted[0].studentName,
+        rollNumber,
+        branch: sorted[0].branch,
+        totalSubmissions: sorted.length,
+        avgOriginality,
+        riskTrendSeries: sorted.map((item) => riskWeight(item.riskLevel) * 22 + 6),
+      };
+    })
+    .sort((left, right) => left.studentName.localeCompare(right.studentName));
+}
+
+export function buildRiskDistribution(submissions: Submission[]) {
+  return {
+    LOW: submissions.filter((item) => item.riskLevel === "LOW").length,
+    MEDIUM: submissions.filter((item) => item.riskLevel === "MEDIUM").length,
+    HIGH: submissions.filter((item) => item.riskLevel === "HIGH").length,
+    CRITICAL: submissions.filter((item) => item.riskLevel === "CRITICAL").length,
+  };
+}
+
+export function buildSubmissionsTimeline(submissions: Submission[]) {
+  const sorted = sortBySubmittedAsc(submissions);
+  const points = sorted.map((item, index) => ({
+    xLabel: new Date(item.submittedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    y: index + 1,
+  }));
+
+  return points.slice(Math.max(points.length - 8, 0));
+}
+
+export function buildTopDetectedSources(submissions: Submission[]) {
+  const totals = new Map<string, number>();
+
+  submissions.forEach((submission) => {
+    submission.detectedSources.forEach((source) => {
+      totals.set(source.name, (totals.get(source.name) ?? 0) + source.percent);
+    });
+  });
+
+  return Array.from(totals.entries())
+    .map(([name, percent]) => ({ name, percent: Math.round(percent / submissions.length) }))
+    .sort((left, right) => right.percent - left.percent)
+    .slice(0, 6);
+}
+
+export function buildInitialVivaState(submissions: Submission[]): Record<string, VivaSubmissionState> {
+  return Object.fromEntries(
+    submissions.map((submission) => [
+      submission.id,
+      {
+        status: submission.riskLevel === "HIGH" || submission.riskLevel === "CRITICAL" ? "Pending" : "Completed",
+        outcome: null,
+        questions: Object.fromEntries(
+          submission.vivaQuestions.map((question) => [
+            question.id,
+            {
+              asked: false,
+              notes: "",
+            },
+          ]),
+        ),
+      },
+    ]),
+  );
+}
+
+export function toSparklinePoints(values: number[], width = 92, height = 28) {
   const min = Math.min(...values);
   const max = Math.max(...values);
 
@@ -197,87 +478,4 @@ export function toSparklinePoints(values: number[], width = 90, height = 28) {
     .join(" ");
 }
 
-export function toReadableDate(input: string) {
-  const parsed = new Date(input);
-  if (Number.isNaN(parsed.getTime())) return input;
-  return parsed.toLocaleString();
-}
 
-export function getRiskLevel(plagiarismPercent: number): TeacherRiskLevel {
-  if (plagiarismPercent >= 60) return "High";
-  if (plagiarismPercent >= 35) return "Medium";
-  return "Low";
-}
-
-export function buildTeacherStats(submissions: TeacherSubmissionRecord[]): TeacherKpiStats {
-  const totalSubmissions = submissions.length;
-  const underReview = submissions.filter((item) => item.status === "Under Review").length;
-  const completed = submissions.filter((item) => item.status === "Completed").length;
-  const highRiskProjects = submissions.filter(
-    (item) => getRiskLevel(item.plagiarismPercent) === "High",
-  ).length;
-
-  return {
-    totalSubmissions,
-    underReview,
-    completed,
-    highRiskProjects,
-  };
-}
-
-export function compareByDate(left: string, right: string) {
-  return new Date(left).getTime() - new Date(right).getTime();
-}
-
-export function buildTeacherStudents(
-  submissions: TeacherSubmissionRecord[],
-): TeacherStudentRecord[] {
-  const grouped = new Map<string, TeacherStudentRecord>();
-
-  submissions.forEach((submission) => {
-    const key = submission.rollNo;
-    const existing = grouped.get(key);
-
-    if (!existing) {
-      grouped.set(key, {
-        id: `ST-${key}`,
-        name: submission.studentName,
-        rollNo: submission.rollNo,
-        totalSubmissions: 1,
-        avgOriginality: submission.originalityPercent,
-        recentProjects: [
-          {
-            id: submission.id,
-            title: submission.projectTitle,
-            submittedAt: submission.submittedAt,
-            status: submission.status,
-          },
-        ],
-      });
-      return;
-    }
-
-    const nextTotal = existing.totalSubmissions + 1;
-    const nextAverage = Math.round(
-      (existing.avgOriginality * existing.totalSubmissions + submission.originalityPercent) /
-        nextTotal,
-    );
-
-    grouped.set(key, {
-      ...existing,
-      totalSubmissions: nextTotal,
-      avgOriginality: nextAverage,
-      recentProjects: [
-        ...existing.recentProjects,
-        {
-          id: submission.id,
-          title: submission.projectTitle,
-          submittedAt: submission.submittedAt,
-          status: submission.status,
-        },
-      ].sort((left, right) => compareByDate(right.submittedAt, left.submittedAt)),
-    });
-  });
-
-  return Array.from(grouped.values()).sort((left, right) => left.name.localeCompare(right.name));
-}

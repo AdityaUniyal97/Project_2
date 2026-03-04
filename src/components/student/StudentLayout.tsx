@@ -1,24 +1,47 @@
-﻿import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useMemo } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import AmbientInnerBackground, { type AmbientVariant } from "../ambient/AmbientInnerBackground";
 import DemoBackground from "../demo/DemoBackground";
 import DemoGlassCard from "../demo/DemoGlassCard";
-import { DEMO_AUTH_STORAGE_KEYS } from "./constants";
 import { BUTTON_INTERACTIVE_CLASS, GLASS_INTERACTIVE_CLASS } from "../ui/glass";
+import { DEMO_AUTH_STORAGE_KEYS } from "./constants";
 
 const STUDENT_NAV_ITEMS = [
   { label: "Overview", to: "/student/overview" },
   { label: "Submit Project", to: "/student/submit" },
+  { label: "AI Review", to: "/student/review" },
+  { label: "Live Coding Check", to: "/student/challenge" },
 ];
 
 function getSectionTitle(pathname: string) {
   if (pathname.startsWith("/student/overview")) return "Overview";
   if (pathname.startsWith("/student/submit")) return "Submit Project";
+  if (pathname.startsWith("/student/review") || pathname.startsWith("/student/analysis")) {
+    return "AI Review";
+  }
+  if (pathname.startsWith("/student/challenge")) return "Live Coding Check";
   return "Overview";
+}
+
+function getStudentAmbientVariant(pathname: string): AmbientVariant {
+  if (pathname.startsWith("/student/overview")) return "student-overview";
+  if (pathname.startsWith("/student/submit")) return "student-submit";
+  if (pathname.startsWith("/student/review") || pathname.startsWith("/student/analysis")) {
+    return "student-review";
+  }
+  if (pathname.startsWith("/student/challenge")) return "student-challenge";
+  return "student-overview";
 }
 
 export default function StudentLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const sectionTitle = getSectionTitle(location.pathname);
+  const ambientVariant = getStudentAmbientVariant(location.pathname);
+  const ambientDebug = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("bgdebug") === "1" || params.get("ambient") === "1";
+  }, [location.search]);
 
   const onSignOut = () => {
     DEMO_AUTH_STORAGE_KEYS.forEach((key) => {
@@ -30,8 +53,19 @@ export default function StudentLayout() {
 
   return (
     <DemoBackground>
-      <div className="mx-auto flex min-h-screen w-full max-w-[1380px] gap-4 px-4 py-6 sm:px-8">
-        <aside className="hidden w-64 shrink-0 md:block">
+      <div className="relative isolate mx-auto flex min-h-screen w-full max-w-[1380px] gap-4 px-4 py-6 sm:px-8">
+        <AmbientInnerBackground
+          variant={ambientVariant}
+          debug={ambientDebug}
+          className="z-[1]"
+        />
+        {ambientDebug ? (
+          <div className="pointer-events-none absolute right-4 top-3 z-[30] rounded-full border border-cyan-300/85 bg-cyan-50/95 px-3 py-1 text-[10px] font-bold tracking-[0.1em] text-cyan-900 shadow-[0_8px_22px_rgba(34,211,238,0.28)]">
+            BG DEBUG ON
+          </div>
+        ) : null}
+
+        <aside className="relative z-[2] hidden w-64 shrink-0 md:block">
           <DemoGlassCard className={`sticky top-6 p-4 ${GLASS_INTERACTIVE_CLASS}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
               ProjectGuard AI
@@ -73,7 +107,7 @@ export default function StudentLayout() {
           </DemoGlassCard>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <div className="relative z-[2] flex min-w-0 flex-1 flex-col gap-4">
           <DemoGlassCard className={`p-4 ${GLASS_INTERACTIVE_CLASS}`}>
             <div className="flex items-center justify-between gap-3">
               <div>

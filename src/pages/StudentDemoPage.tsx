@@ -1,8 +1,12 @@
 ﻿import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import DemoGlassCard from "../components/demo/DemoGlassCard";
 import StatusBadge from "../components/demo/StatusBadge";
-import { STUDENT_SUBMISSIONS_STORAGE_KEY } from "../components/student/constants";
+import {
+  STUDENT_REVIEW_DRAFT_STORAGE_KEY,
+  STUDENT_SUBMISSIONS_STORAGE_KEY,
+} from "../components/student/constants";
 import {
   BUTTON_INTERACTIVE_CLASS,
   GLASS_INTERACTIVE_CLASS,
@@ -53,6 +57,16 @@ interface LocalSubmissionRecord {
   githubLink: string;
   originality: number;
   plagiarism: number;
+}
+
+interface StudentReviewDraft {
+  studentName?: string;
+  rollNumber: string;
+  branch: string;
+  projectTitle: string;
+  githubRepo: string;
+  liveLink: string;
+  description?: string;
 }
 
 type FieldKey = "projectTitle" | "branch" | "rollNumber" | "githubLink" | "liveDemoUrl";
@@ -157,6 +171,7 @@ function SectionHint({ title, hint }: { title: string; hint: string }) {
 }
 
 export default function StudentDemoPage() {
+  const navigate = useNavigate();
   const [formState, setFormState] = useState<SubmitFormState>(createInitialFormState);
   const [touched, setTouched] = useState<TouchedState>({});
   const [didAttemptSubmit, setDidAttemptSubmit] = useState(false);
@@ -432,6 +447,16 @@ export default function StudentDemoPage() {
         plagiarism: scores.plagiarism,
       };
 
+      const reviewDraft: StudentReviewDraft = {
+        rollNumber: formState.rollNumber.trim(),
+        branch: formState.branch.trim(),
+        projectTitle: normalizedTitle,
+        githubRepo: formState.githubLink.trim(),
+        liveLink: formState.liveDemoUrl.trim(),
+      };
+
+      localStorage.setItem(STUDENT_REVIEW_DRAFT_STORAGE_KEY, JSON.stringify(reviewDraft));
+
       setSubmissions((current) => [submissionItem, ...current]);
       setIsSubmitting(false);
       setShowSuccessState(true);
@@ -446,6 +471,7 @@ export default function StudentDemoPage() {
       }
 
       submitTimeoutRef.current = null;
+      navigate("/student/review");
     }, delay);
   };
 

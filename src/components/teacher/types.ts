@@ -1,45 +1,74 @@
 export type TeacherSubmissionStatus = "Under Review" | "Completed";
 
-export type TeacherRiskLevel = "Low" | "Medium" | "High";
+export type TeacherRiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type ProjectType = "web" | "mobile" | "cli";
 
-export interface TeacherDetectedSource {
+export type VivaDifficulty = "Easy" | "Medium" | "Hard";
+
+export type VivaOutcome = "Pass" | "Needs Review" | "Fail";
+
+export type VivaQueueStatus = "Pending" | "Completed";
+
+export interface DetectedSource {
   name: string;
-  similarity: number;
+  percent: number;
 }
 
-export interface TeacherSubmissionRecord {
+export interface VivaQuestion {
+  id: string;
+  topicTag: string;
+  difficulty: VivaDifficulty;
+  question: string;
+  expectedTalkingPoints: string;
+}
+
+export interface Submission {
   id: string;
   studentName: string;
-  rollNo: string;
+  rollNumber: string;
   branch: string;
   projectTitle: string;
   submittedAt: string;
-  plagiarismPercent: number;
+  status: TeacherSubmissionStatus;
+  riskLevel: TeacherRiskLevel;
   originalityPercent: number;
-  status: TeacherSubmissionStatus;
-  detectedSources: TeacherDetectedSource[];
-  vivaSuggestions: string[];
+  plagiarismPercent: number;
+  structuralOverlapPercent: number;
+  aiConfidencePercent: number;
+  commitRiskScore: number;
+  projectType: ProjectType;
+  liveDemoUrl?: string;
+  githubUrl?: string;
+  summaryNarrative: string;
+  detectedSources: DetectedSource[];
+  vivaQuestions: VivaQuestion[];
 }
 
-export interface TeacherKpiStats {
-  totalSubmissions: number;
-  underReview: number;
-  completed: number;
-  highRiskProjects: number;
-}
-
-export interface TeacherStudentProject {
+export interface StudentProfile {
   id: string;
-  title: string;
-  submittedAt: string;
-  status: TeacherSubmissionStatus;
-}
-
-export interface TeacherStudentRecord {
-  id: string;
-  name: string;
-  rollNo: string;
+  studentName: string;
+  rollNumber: string;
+  branch: string;
   totalSubmissions: number;
   avgOriginality: number;
-  recentProjects: TeacherStudentProject[];
+  riskTrendSeries: number[];
+}
+
+export interface VivaQuestionState {
+  asked: boolean;
+  notes: string;
+}
+
+export interface VivaSubmissionState {
+  status: VivaQueueStatus;
+  outcome: VivaOutcome | null;
+  questions: Record<string, VivaQuestionState>;
+}
+
+export interface TeacherSettingsState {
+  autoAnalysis: boolean;
+  strictMode: boolean;
+  vivaRequiredForHighRisk: boolean;
+  similarityThreshold: number;
+  confidenceThreshold: number;
 }
