@@ -6,6 +6,9 @@ import DemoGlassCard from "../demo/DemoGlassCard";
 import { DEMO_AUTH_STORAGE_KEYS } from "../student/constants";
 import { BUTTON_INTERACTIVE_CLASS, GLASS_INTERACTIVE_CLASS } from "../ui/glass";
 import { TeacherDataProvider } from "./TeacherDataContext";
+import { logout } from "../../lib/authClient";
+import { useAuth } from "../../context/AuthContext";
+import { getAvatarImageUrl, getAvatarInitials } from "../../lib/avatar";
 
 const TEACHER_NAV_ITEMS = [
   { label: "Overview", to: "/teacher/overview" },
@@ -14,6 +17,7 @@ const TEACHER_NAV_ITEMS = [
   { label: "Viva", to: "/teacher/viva" },
   { label: "Students", to: "/teacher/students" },
   { label: "Settings", to: "/teacher/settings" },
+  { label: "Account", to: "/teacher/account" },
 ];
 
 function getSectionTitle(pathname: string) {
@@ -24,6 +28,7 @@ function getSectionTitle(pathname: string) {
   if (pathname.startsWith("/teacher/demo")) return "Live Demo";
   if (pathname.startsWith("/teacher/students")) return "Students";
   if (pathname.startsWith("/teacher/settings")) return "Settings";
+  if (pathname.startsWith("/teacher/account")) return "Account";
   return "Overview";
 }
 
@@ -35,6 +40,7 @@ function getTeacherAmbientVariant(pathname: string): AmbientVariant {
   if (pathname.startsWith("/teacher/demo")) return "teacher-demo";
   if (pathname.startsWith("/teacher/students")) return "teacher-students";
   if (pathname.startsWith("/teacher/settings")) return "teacher-settings";
+  if (pathname.startsWith("/teacher/account")) return "teacher-overview";
   return "teacher-overview";
 }
 
@@ -48,12 +54,22 @@ export default function TeacherLayout() {
     return params.get("bgdebug") === "1" || params.get("ambient") === "1";
   }, [location.search]);
 
-  const onSignOut = () => {
+  const { user, setUser } = useAuth();
+  const avatarImageUrl = getAvatarImageUrl(user);
+  const avatarInitials = getAvatarInitials(user?.name ?? "User");
+
+  const onSignOut = async () => {
+    try {
+      await logout();
+    } catch {
+      // ignore
+    }
     DEMO_AUTH_STORAGE_KEYS.forEach((key) => {
       localStorage.removeItem(key);
       sessionStorage.removeItem(key);
     });
-    navigate("/", { replace: true });
+    setUser(null);
+    navigate("/auth", { replace: true });
   };
 
   return (
@@ -125,13 +141,35 @@ export default function TeacherLayout() {
                   </p>
                   <h1 className="text-base font-semibold text-slate-900 sm:text-lg">{sectionTitle}</h1>
                 </div>
-                <button
-                  type="button"
-                  onClick={onSignOut}
-                  className={`rounded-xl border border-white/60 bg-white/50 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-[0_8px_20px_rgba(30,64,175,0.08)] transition hover:bg-white/75 ${BUTTON_INTERACTIVE_CLASS}`}
-                >
-                  Sign out
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/teacher/account")}
+                    className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white/55 text-xs font-semibold text-slate-700 shadow-[0_8px_20px_rgba(30,64,175,0.08)] transition hover:bg-white/75 ${BUTTON_INTERACTIVE_CLASS}`}
+                    aria-label="Open account section"
+                  >
+                    <span className="absolute inset-0 flex items-center justify-center bg-blue-100/80 text-[11px] font-semibold text-blue-700">
+                      {avatarInitials}
+                    </span>
+                    {avatarImageUrl ? (
+                      <img
+                        src={avatarImageUrl}
+                        alt={`${user?.name ?? "User"} avatar`}
+                        className="relative z-[1] h-full w-full object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : null}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onSignOut}
+                    className={`rounded-xl border border-white/60 bg-white/50 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-[0_8px_20px_rgba(30,64,175,0.08)] transition hover:bg-white/75 ${BUTTON_INTERACTIVE_CLASS}`}
+                  >
+                    Sign out
+                  </button>
+                </div>
               </div>
 
               <nav className="mt-4 flex items-center gap-2 overflow-x-auto md:hidden">

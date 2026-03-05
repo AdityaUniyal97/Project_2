@@ -1,12 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TopNav from "./components/auth/TopNav";
 import AnimatedBackground from "./components/auth/AnimatedBackground";
 import AuthFlipCard, { type AuthMode } from "./components/auth/AuthFlipCard";
 import { useParallax } from "./components/auth/useParallax";
 
-export default function App() {
+interface AppProps {
+  initialMode?: AuthMode;
+}
+
+export default function App({ initialMode = "signin" }: AppProps) {
   const parallax = useParallax();
-  const [authMode, setAuthMode] = useState<AuthMode>("signin");
+  const [authMode, setAuthMode] = useState<AuthMode>(initialMode);
+
+  useEffect(() => {
+    setAuthMode(initialMode);
+  }, [initialMode]);
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden">

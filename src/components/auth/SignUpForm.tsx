@@ -1,27 +1,46 @@
 import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 
+import { getDashboardPathForRole, register, type UserRole } from "../../lib/authClient";
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
+
 interface Props {
   onSwitchToSignin: () => void;
 }
 
-type UserType = "student" | "teacher";
-
 export default function SignUpForm({ onSwitchToSignin }: Props) {
-  const [userType, setUserType] = useState<UserType>("student");
+  const [userType, setUserType] = useState<UserRole>("student");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const { setUser } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
+
+    setError("");
     setSubmitting(true);
     setIsSuccess(false);
-    setTimeout(() => {
-      setSubmitting(false);
+
+    try {
+      const response = await register({ name, email, password, role: userType });
       setIsSuccess(true);
-      setTimeout(() => onSwitchToSignin(), 500);
-    }, 850);
+      setUser(response.user);
+      setTimeout(() => {
+        const redirectPath = getDashboardPathForRole(response.user.role);
+        navigate(redirectPath);
+      }, 500);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Registration failed. Please try again.";
+      setError(message);
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -62,12 +81,21 @@ export default function SignUpForm({ onSwitchToSignin }: Props) {
         className="mt-6 flex-1 space-y-4 overflow-y-auto pr-1"
         onSubmit={handleSubmit}
       >
+        {error && (
+          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-[13px] text-red-700">
+            {error}
+          </div>
+        )}
+
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-slate-700">Full Name</label>
           <input
             type="text"
             placeholder="Enter your full name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             disabled={submitting}
+            required
             className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
           />
         </div>
@@ -79,7 +107,10 @@ export default function SignUpForm({ onSwitchToSignin }: Props) {
           <input
             type="email"
             placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             disabled={submitting}
+            required
             className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
           />
         </div>
@@ -88,82 +119,22 @@ export default function SignUpForm({ onSwitchToSignin }: Props) {
           <label className="mb-1.5 block text-[13px] font-medium text-slate-700">Password</label>
           <input
             type="password"
-            placeholder="Create a strong password"
+            placeholder="Create a strong password (min 8 characters)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             disabled={submitting}
+            required
+            minLength={8}
             className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
           />
         </div>
-
-        {userType === "student" && (
-          <>
-            <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
-                Student ID
-              </label>
-              <input
-                type="text"
-                placeholder="Enter your student ID"
-                disabled={submitting}
-                className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
-                Major / Course
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Computer Science"
-                disabled={submitting}
-                className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
-              />
-            </div>
-          </>
-        )}
-
-        {userType === "teacher" && (
-          <>
-            <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
-                Employee ID
-              </label>
-              <input
-                type="text"
-                placeholder="Enter your employee ID"
-                disabled={submitting}
-                className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
-                Department
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Computer Science Dept."
-                disabled={submitting}
-                className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
-                Subject / Specialization
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Data Structures"
-                disabled={submitting}
-                className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
-              />
-            </div>
-          </>
-        )}
 
         <div className="flex items-start gap-2 text-[13px]">
           <input
             type="checkbox"
             id="terms"
             disabled={submitting}
+            required
             className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 accent-blue-600 focus:ring-blue-300"
           />
           <label htmlFor="terms" className="select-none text-slate-600">
@@ -181,7 +152,7 @@ export default function SignUpForm({ onSwitchToSignin }: Props) {
               : { scale: 1, boxShadow: "0 8px 24px rgba(59,130,246,0.25)" }
           }
           transition={{ duration: 0.3 }}
-          className={`w-full rounded-xl py-3.5 text-[14px] font-semibold text-white transition-all hover:brightness-[1.04] disabled:opacity-80 ${
+          className={`w-full rounded-xl py-3.5 text-[14px] font-semibold text-white transition-all hover:brightness-[1.04] disabled:opacity-80 disabled:cursor-not-allowed ${
             isSuccess
               ? "bg-gradient-to-r from-emerald-600 to-emerald-500 shadow-md shadow-emerald-500/30"
               : "bg-gradient-to-r from-blue-600 to-blue-500 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 active:scale-[0.98]"
@@ -221,7 +192,7 @@ export default function SignUpForm({ onSwitchToSignin }: Props) {
                   strokeLinejoin="round"
                 />
               </svg>
-              Account Created
+              Success! Redirecting...
             </span>
           ) : (
             "Create Account"
@@ -234,8 +205,9 @@ export default function SignUpForm({ onSwitchToSignin }: Props) {
         <motion.button
           type="button"
           onClick={onSwitchToSignin}
+          disabled={submitting}
           whileTap={{ scale: 0.97 }}
-          className="font-medium text-blue-600 transition-colors hover:text-blue-700"
+          className="font-medium text-blue-600 transition-colors hover:text-blue-700 disabled:opacity-70"
         >
           Sign in
         </motion.button>

@@ -1,7 +1,7 @@
-﻿import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import DemoGlassCard from "../../components/demo/DemoGlassCard";
-import { STUDENT_SUBMISSIONS_STORAGE_KEY } from "../../components/student/constants";
+import { listSubmissions, type SubmissionRecord, type SubmissionStatus } from "../../lib/api";
 import {
   BUTTON_INTERACTIVE_CLASS,
   GLASS_INTERACTIVE_CLASS,
@@ -9,13 +9,6 @@ import {
   LIST_ROW_INTERACTIVE_CLASS,
 } from "../../components/ui/glass";
 import type { StudentStats, StudentSubmission } from "../../components/student/types";
-
-interface StoredSubmissionItem {
-  id: string;
-  projectTitle: string;
-  submittedAt: string;
-  status?: "Under Review" | "Completed";
-}
 
 interface KpiCardData {
   id: string;
@@ -26,144 +19,29 @@ interface KpiCardData {
   sparkline: number[];
 }
 
-const DEMO_SUBMISSIONS: StudentSubmission[] = [
-  {
-    id: "OVR-001",
-    title: "AI Attendance System",
-    date: "2026-03-03T09:20:00",
-    status: "Under Review",
-    originality: 72,
-    plagiarism: 28,
-  },
-  {
-    id: "OVR-002",
-    title: "Smart Library Assistant",
-    date: "2026-02-25T15:42:00",
-    status: "Completed",
-    originality: 89,
-    plagiarism: 11,
-  },
-  {
-    id: "OVR-003",
-    title: "Campus Event Tracker",
-    date: "2026-02-18T13:05:00",
-    status: "Completed",
-    originality: 81,
-    plagiarism: 19,
-  },
-  {
-    id: "OVR-004",
-    title: "Hostel Complaint Portal",
-    date: "2026-02-12T11:30:00",
-    status: "Under Review",
-    originality: 76,
-    plagiarism: 24,
-  },
-  {
-    id: "OVR-005",
-    title: "Placement Insights Dashboard",
-    date: "2026-01-29T16:08:00",
-    status: "Completed",
-    originality: 91,
-    plagiarism: 9,
-  },
-  {
-    id: "OVR-006",
-    title: "Internship Matching App",
-    date: "2026-01-14T10:12:00",
-    status: "Completed",
-    originality: 85,
-    plagiarism: 15,
-  },
-  {
-    id: "OVR-007",
-    title: "IoT Energy Monitor",
-    date: "2025-12-21T14:55:00",
-    status: "Under Review",
-    originality: 68,
-    plagiarism: 32,
-  },
-  {
-    id: "OVR-008",
-    title: "Code Similarity Checker",
-    date: "2025-12-10T09:47:00",
-    status: "Completed",
-    originality: 79,
-    plagiarism: 21,
-  },
-];
-
-const DEFAULT_TREND_DATA = [68, 72, 77, 75, 83, 88];
-
-const ACHIEVEMENTS = [
-  {
-    label: "First Submission",
-    unlocked: true,
-    hint: "Unlocked after your first successful project upload.",
-  },
-  {
-    label: "3 Projects Submitted",
-    unlocked: true,
-    hint: "Maintain activity to keep your momentum score high.",
-  },
-  {
-    label: "High Originality (90%+)",
-    unlocked: true,
-    hint: "Excellent originality benchmark achieved.",
-  },
-  {
-    label: "Consistent Submitter",
-    unlocked: false,
-    hint: "Submit at least one project for 3 consecutive months.",
-  },
-  {
-    label: "Quick Iteration",
-    unlocked: false,
-    hint: "Push two reviewed updates in one week.",
-  },
-  {
-    label: "Zero-Flag Sprint",
-    unlocked: false,
-    hint: "Complete 5 submissions with low-risk plagiarism levels.",
-  },
-];
-
-function numericHash(input: string) {
-  let hash = 0;
-  for (let index = 0; index < input.length; index += 1) {
-    hash = (hash * 31 + input.charCodeAt(index)) % 997;
-  }
-  return hash;
-}
-
-function normalizeDate(input: string) {
-  const parsed = new Date(input);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString();
-  }
-  return new Date().toISOString();
-}
-
-function fromStoredSubmission(item: StoredSubmissionItem): StudentSubmission {
-  const hash = numericHash(`${item.id}-${item.projectTitle}`);
-  const originality = 65 + (hash % 31);
-
-  return {
-    id: item.id,
-    title: item.projectTitle,
-    date: normalizeDate(item.submittedAt),
-    status: item.status ?? "Under Review",
-    originality,
-    plagiarism: 100 - originality,
-  };
-}
-
 function toReadableDate(input: string) {
   const parsed = new Date(input);
   if (Number.isNaN(parsed.getTime())) {
     return input;
   }
   return parsed.toLocaleString();
+}
+
+function isCompletedStatus(status: SubmissionStatus) {
+  return status === "done" || status === "completed";
+}
+
+function isUnderReviewStatus(status: SubmissionStatus) {
+  return ["submitted", "queued", "processing"].includes(status);
+}
+
+function toStatusLabel(status: SubmissionStatus) {
+  if (status === "done" || status === "completed") return "Completed";
+  if (status === "submitted") return "Submitted";
+  if (status === "queued") return "Queued";
+  if (status === "processing") return "Processing";
+  if (status === "failed") return "Failed";
+  return "Draft";
 }
 
 function buildMonthlyBars(submissions: StudentSubmission[]) {
@@ -193,20 +71,15 @@ function buildMonthlyBars(submissions: StudentSubmission[]) {
 
 function buildStats(submissions: StudentSubmission[]): StudentStats {
   const totalSubmissions = submissions.length;
-  const underReview = submissions.filter((item) => item.status === "Under Review").length;
-  const completed = submissions.filter((item) => item.status === "Completed").length;
-  const avgOriginality =
-    totalSubmissions > 0
-      ? Math.round(
-          submissions.reduce((sum, item) => sum + item.originality, 0) / totalSubmissions,
-        )
-      : 0;
+  const underReview = submissions.filter((item) => isUnderReviewStatus(item.status)).length;
+  const completed = submissions.filter((item) => isCompletedStatus(item.status)).length;
+  const completedRate = totalSubmissions > 0 ? Math.round((completed / totalSubmissions) * 100) : 0;
 
   return {
     totalSubmissions,
     underReview,
     completed,
-    avgOriginality,
+    completedRate,
   };
 }
 
@@ -224,6 +97,14 @@ function toSparklinePoints(values: number[]) {
       return `${x},${y}`;
     })
     .join(" ");
+}
+
+function toTrend(current: number, previous: number) {
+  if (current === previous) return "0%";
+  if (previous === 0) return current > 0 ? "+100%" : "0%";
+
+  const change = Math.round(((current - previous) / previous) * 100);
+  return `${change > 0 ? "+" : ""}${change}%`;
 }
 
 function CountUpValue({ value }: { value: number }) {
@@ -258,27 +139,36 @@ function CountUpValue({ value }: { value: number }) {
 }
 
 function StatusIndicator({ status }: { status: StudentSubmission["status"] }) {
-  if (status === "Under Review") {
+  if (isCompletedStatus(status)) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/90 bg-amber-50/85 px-2.5 py-1 text-xs font-semibold text-amber-700">
-        <span className="dot-pulse h-1.5 w-1.5 rounded-full bg-amber-500" />
-        Under Review
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/90 bg-emerald-50/85 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
+          <path
+            d="M12.8 4.6L6.7 10.7L3.2 7.2"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        {toStatusLabel(status)}
+      </span>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200/90 bg-rose-50/85 px-2.5 py-1 text-xs font-semibold text-rose-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+        {toStatusLabel(status)}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/90 bg-emerald-50/85 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
-        <path
-          d="M12.8 4.6L6.7 10.7L3.2 7.2"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      Completed
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/90 bg-amber-50/85 px-2.5 py-1 text-xs font-semibold text-amber-700">
+      <span className="dot-pulse h-1.5 w-1.5 rounded-full bg-amber-500" />
+      {toStatusLabel(status)}
     </span>
   );
 }
@@ -305,7 +195,7 @@ function KpiCard({ item, index }: { item: KpiCardData; index: number }) {
       </div>
       <p className="mt-2 text-2xl font-semibold text-slate-900">
         <CountUpValue value={item.value} />
-        {item.id === "avg" ? "%" : ""}
+        {item.id === "rate" ? "%" : ""}
       </p>
       <svg className="mt-2 h-7 w-24" viewBox="0 0 88 26" fill="none" aria-hidden>
         <polyline
@@ -320,50 +210,95 @@ function KpiCard({ item, index }: { item: KpiCardData; index: number }) {
   );
 }
 
+function toViewSubmission(item: SubmissionRecord): StudentSubmission {
+  return {
+    id: item.id,
+    title: item.title,
+    date: item.createdAt,
+    status: item.status,
+    repoUrl: item.repoUrl,
+    branch: item.branch,
+    description: item.description,
+  };
+}
+
+function truncateText(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 3)}...`;
+}
+
 export default function StudentOverviewPage() {
   const [showAll, setShowAll] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [allSubmissions, setAllSubmissions] = useState<StudentSubmission[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const allSubmissions = useMemo(() => {
-    let storedSubmissions: StudentSubmission[] = [];
+  useEffect(() => {
+    let mounted = true;
 
-    try {
-      const rawValue = localStorage.getItem(STUDENT_SUBMISSIONS_STORAGE_KEY);
-      if (rawValue) {
-        const parsed = JSON.parse(rawValue) as StoredSubmissionItem[];
-        if (Array.isArray(parsed)) {
-          storedSubmissions = parsed.map(fromStoredSubmission);
+    const loadSubmissions = async () => {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const response = await listSubmissions();
+        if (!mounted) return;
+
+        const mapped = response.submissions
+          .map(toViewSubmission)
+          .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+
+        setAllSubmissions(mapped);
+      } catch (requestError) {
+        if (!mounted) return;
+        setError(requestError instanceof Error ? requestError.message : "Unable to load submissions.");
+        setAllSubmissions([]);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
         }
       }
-    } catch {
-      storedSubmissions = [];
-    }
+    };
 
-    const mergedMap = new Map<string, StudentSubmission>();
+    void loadSubmissions();
 
-    [...storedSubmissions, ...DEMO_SUBMISSIONS].forEach((submission) => {
-      if (!mergedMap.has(submission.id)) {
-        mergedMap.set(submission.id, submission);
-      }
-    });
-
-    return Array.from(mergedMap.values()).sort(
-      (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime(),
-    );
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const stats = useMemo(() => buildStats(allSubmissions), [allSubmissions]);
   const visibleSubmissions = showAll ? allSubmissions : allSubmissions.slice(0, 6);
 
-  const trendValues = useMemo(() => {
-    const sampled = allSubmissions
-      .slice(0, 6)
-      .map((item) => item.originality)
-      .reverse();
+  const monthlyBars = useMemo(() => buildMonthlyBars(allSubmissions), [allSubmissions]);
+  const maxBarValue = Math.max(...monthlyBars.map((item) => item.value), 1);
+  const trendValues = useMemo(() => monthlyBars.map((bar) => bar.value), [monthlyBars]);
 
-    if (sampled.length >= 4) return sampled;
-    return DEFAULT_TREND_DATA;
-  }, [allSubmissions]);
+  const thisMonthCount = monthlyBars[monthlyBars.length - 1]?.value ?? 0;
+  const previousMonthCount = monthlyBars[monthlyBars.length - 2]?.value ?? 0;
+  const completedCurrentMonth = allSubmissions.filter((submission) => {
+    const date = new Date(submission.date);
+    const now = new Date();
+
+    return (
+      isCompletedStatus(submission.status) &&
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth()
+    );
+  }).length;
+
+  const completedPreviousMonth = allSubmissions.filter((submission) => {
+    const date = new Date(submission.date);
+    const previous = new Date();
+    previous.setMonth(previous.getMonth() - 1);
+
+    return (
+      isCompletedStatus(submission.status) &&
+      date.getFullYear() === previous.getFullYear() &&
+      date.getMonth() === previous.getMonth()
+    );
+  }).length;
 
   const kpiCards = useMemo<KpiCardData[]>(
     () => [
@@ -371,53 +306,60 @@ export default function StudentOverviewPage() {
         id: "total",
         label: "Total Submissions",
         value: stats.totalSubmissions,
-        trend: "+9%",
+        trend: toTrend(thisMonthCount, previousMonthCount),
         tone: "blue",
-        sparkline: [2, 3, 3, 4, 5, 6],
+        sparkline: trendValues.length ? trendValues : [0, 0, 0, 0, 0, 0],
       },
       {
         id: "review",
         label: "Under Review",
         value: stats.underReview,
-        trend: "+2%",
+        trend: toTrend(stats.underReview, Math.max(stats.totalSubmissions - stats.underReview, 0)),
         tone: "amber",
-        sparkline: [1, 2, 2, 2, 3, 3],
+        sparkline: trendValues.length ? trendValues : [0, 0, 0, 0, 0, 0],
       },
       {
         id: "completed",
         label: "Completed",
         value: stats.completed,
-        trend: "+14%",
+        trend: toTrend(completedCurrentMonth, completedPreviousMonth),
         tone: "emerald",
-        sparkline: [1, 1, 2, 3, 4, 4],
+        sparkline: trendValues.length ? trendValues : [0, 0, 0, 0, 0, 0],
       },
       {
-        id: "avg",
-        label: "Avg Originality",
-        value: stats.avgOriginality,
-        trend: "+5%",
+        id: "rate",
+        label: "Completed Rate",
+        value: stats.completedRate,
+        trend: stats.totalSubmissions > 0 ? "Live" : "0%",
         tone: "blue",
-        sparkline: [70, 72, 77, 79, 83, stats.avgOriginality],
+        sparkline: trendValues.length ? trendValues : [0, 0, 0, 0, 0, 0],
       },
     ],
-    [stats],
+    [
+      completedCurrentMonth,
+      completedPreviousMonth,
+      previousMonthCount,
+      stats.completed,
+      stats.completedRate,
+      stats.totalSubmissions,
+      stats.underReview,
+      thisMonthCount,
+      trendValues,
+    ],
   );
-
-  const monthlyBars = useMemo(() => buildMonthlyBars(allSubmissions), [allSubmissions]);
-  const maxBarValue = Math.max(...monthlyBars.map((item) => item.value), 1);
 
   const svgWidth = 360;
   const svgHeight = 160;
   const graphPadding = 22;
-  const graphMin = 55;
-  const graphMax = 100;
+  const graphMin = 0;
+  const graphMax = Math.max(...trendValues, 1);
 
   const trendPoints = trendValues
     .map((value, index) => {
       const x =
         graphPadding +
         (index * (svgWidth - graphPadding * 2)) / Math.max(trendValues.length - 1, 1);
-      const normalized = (value - graphMin) / (graphMax - graphMin);
+      const normalized = graphMax === 0 ? 0 : (value - graphMin) / Math.max(graphMax - graphMin, 1);
       const y = svgHeight - graphPadding - normalized * (svgHeight - graphPadding * 2);
       return `${x},${y}`;
     })
@@ -459,6 +401,8 @@ export default function StudentOverviewPage() {
             </button>
           </div>
 
+          {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
+
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-slate-600">
@@ -466,81 +410,90 @@ export default function StudentOverviewPage() {
                   <th className="px-2 py-2 font-semibold">Project Title</th>
                   <th className="px-2 py-2 font-semibold">Date</th>
                   <th className="px-2 py-2 font-semibold">Status</th>
-                  <th className="px-2 py-2 font-semibold">Originality</th>
+                  <th className="px-2 py-2 font-semibold">Repository</th>
                 </tr>
               </thead>
               <tbody>
-                {visibleSubmissions.map((submission) => {
-                  const expanded = expandedRowId === submission.id;
-                  return (
-                    <Fragment key={submission.id}>
-                      <tr
-                        className={`group cursor-pointer border-t border-white/40 text-slate-700 ${LIST_ROW_INTERACTIVE_CLASS}`}
-                        onClick={() =>
-                          setExpandedRowId((current) =>
-                            current === submission.id ? null : submission.id,
-                          )
-                        }
-                      >
-                        <td className="px-2 py-2.5 font-medium text-slate-900">{submission.title}</td>
-                        <td className="px-2 py-2.5 text-xs text-slate-600">
-                          {toReadableDate(submission.date)}
-                        </td>
-                        <td className="px-2 py-2.5">
-                          <StatusIndicator status={submission.status} />
-                        </td>
-                        <td className="px-2 py-2.5 text-sm font-semibold text-slate-800">
-                          {submission.originality}% originality
-                        </td>
-                      </tr>
-                      <AnimatePresence initial={false}>
-                        {expanded ? (
-                          <motion.tr
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.22 }}
-                          >
-                            <td colSpan={4} className="border-t border-white/35 px-3 py-3">
-                              <div className="rounded-xl border border-white/55 bg-white/45 p-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                  Status Timeline
-                                </p>
-                                <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                                  <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-2 text-xs font-medium text-emerald-700">
-                                    Submitted
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={4} className="px-2 py-4 text-sm text-slate-600">
+                      Loading submissions...
+                    </td>
+                  </tr>
+                ) : visibleSubmissions.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-2 py-4 text-sm text-slate-600">
+                      No submissions yet. Create one from the Submit Project page.
+                    </td>
+                  </tr>
+                ) : (
+                  visibleSubmissions.map((submission) => {
+                    const expanded = expandedRowId === submission.id;
+                    return (
+                      <Fragment key={submission.id}>
+                        <tr
+                          className={`group cursor-pointer border-t border-white/40 text-slate-700 ${LIST_ROW_INTERACTIVE_CLASS}`}
+                          onClick={() =>
+                            setExpandedRowId((current) =>
+                              current === submission.id ? null : submission.id,
+                            )
+                          }
+                        >
+                          <td className="px-2 py-2.5 font-medium text-slate-900">{submission.title}</td>
+                          <td className="px-2 py-2.5 text-xs text-slate-600">
+                            {toReadableDate(submission.date)}
+                          </td>
+                          <td className="px-2 py-2.5">
+                            <StatusIndicator status={submission.status} />
+                          </td>
+                          <td className="px-2 py-2.5 text-sm font-medium text-blue-700">
+                            {truncateText(submission.repoUrl, 34)}
+                          </td>
+                        </tr>
+                        <AnimatePresence initial={false}>
+                          {expanded ? (
+                            <motion.tr
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.22 }}
+                            >
+                              <td colSpan={4} className="border-t border-white/35 px-3 py-3">
+                                <div className="rounded-xl border border-white/55 bg-white/45 p-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Submission Details
+                                  </p>
+                                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                                    <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 py-2 text-xs font-medium text-emerald-700">
+                                      Branch: {submission.branch || "main"}
+                                    </div>
+                                    <div className="rounded-lg border border-blue-200/80 bg-blue-50/80 px-2.5 py-2 text-xs font-medium text-blue-700">
+                                      Status: {toStatusLabel(submission.status)}
+                                    </div>
+                                    <div className="rounded-lg border border-white/65 bg-white/65 px-2.5 py-2 text-xs font-medium text-slate-700">
+                                      Updated: {toReadableDate(submission.date)}
+                                    </div>
                                   </div>
-                                  <div className="rounded-lg border border-blue-200/80 bg-blue-50/80 px-2.5 py-2 text-xs font-medium text-blue-700">
-                                    AI Analysis
-                                  </div>
-                                  <div className="rounded-lg border border-white/65 bg-white/65 px-2.5 py-2 text-xs font-medium text-slate-700">
-                                    {submission.status === "Completed"
-                                      ? "Completed"
-                                      : "Teacher Review"}
+                                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                                    <a
+                                      href={submission.repoUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={`rounded-lg border border-white/70 bg-white/65 px-2.5 py-1.5 font-semibold text-slate-700 ${BUTTON_INTERACTIVE_CLASS}`}
+                                      onClick={(event) => event.stopPropagation()}
+                                    >
+                                      Open Repository
+                                    </a>
                                   </div>
                                 </div>
-                                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                                  <button
-                                    type="button"
-                                    className={`rounded-lg border border-white/70 bg-white/65 px-2.5 py-1.5 font-semibold text-slate-700 ${BUTTON_INTERACTIVE_CLASS}`}
-                                  >
-                                    Open Report
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={`rounded-lg border border-white/70 bg-white/65 px-2.5 py-1.5 font-semibold text-slate-700 ${BUTTON_INTERACTIVE_CLASS}`}
-                                  >
-                                    View Sources
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </motion.tr>
-                        ) : null}
-                      </AnimatePresence>
-                    </Fragment>
-                  );
-                })}
+                              </td>
+                            </motion.tr>
+                          ) : null}
+                        </AnimatePresence>
+                      </Fragment>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -554,42 +507,34 @@ export default function StudentOverviewPage() {
         transition={{ duration: 0.3, delay: 0.09 }}
       >
         <DemoGlassCard className={`p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
-          <h3 className="text-base font-semibold text-slate-900">Achievements</h3>
+          <h3 className="text-base font-semibold text-slate-900">Submission Distribution</h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {ACHIEVEMENTS.map((achievement) => (
-              <div
-                key={achievement.label}
-                className={`group relative rounded-2xl border p-3 transition ${
-                  achievement.unlocked
-                    ? "border-emerald-200/80 bg-emerald-50/65"
-                    : "border-white/55 bg-white/35 opacity-80"
-                }`}
-              >
-                <p
-                  className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                    achievement.unlocked ? "text-emerald-700" : "text-slate-500"
-                  }`}
-                >
-                  {!achievement.unlocked ? (
-                    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
-                      <rect x="3.4" y="7" width="9.2" height="6" rx="1.3" stroke="currentColor" strokeWidth="1.4" />
-                      <path d="M5.4 7V5.8a2.6 2.6 0 015.2 0V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                    </svg>
-                  ) : null}
-                  {achievement.unlocked ? "Unlocked" : "Locked"}
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-800">{achievement.label}</p>
-                <div className="pointer-events-none absolute bottom-[calc(100%+6px)] left-2 z-10 w-44 rounded-lg border border-white/60 bg-slate-900/85 px-2 py-1.5 text-[11px] text-slate-100 opacity-0 shadow-lg transition group-hover:opacity-100">
-                  {achievement.hint}
-                </div>
-              </div>
-            ))}
+            <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/65 p-3">
+              <p className="text-xs font-semibold text-emerald-700">Completed</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{stats.completed} submissions</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/65 p-3">
+              <p className="text-xs font-semibold text-amber-700">Under Review</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{stats.underReview} submissions</p>
+            </div>
+            <div className="rounded-2xl border border-rose-200/80 bg-rose-50/65 p-3">
+              <p className="text-xs font-semibold text-rose-700">Failed</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">
+                {allSubmissions.filter((item) => item.status === "failed").length} submissions
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/80 bg-white/55 p-3">
+              <p className="text-xs font-semibold text-slate-700">Draft</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">
+                {allSubmissions.filter((item) => item.status === "draft").length} submissions
+              </p>
+            </div>
           </div>
         </DemoGlassCard>
 
         <DemoGlassCard className={`p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
-          <h3 className="text-base font-semibold text-slate-900">Originality Trend</h3>
-          <p className="mt-1 text-xs text-slate-600">Latest submissions</p>
+          <h3 className="text-base font-semibold text-slate-900">Submission Trend</h3>
+          <p className="mt-1 text-xs text-slate-600">Last 6 months</p>
           <svg className="mt-3 w-full" viewBox={`0 0 ${svgWidth} ${svgHeight}`}>
             <polyline
               fill="none"
@@ -603,7 +548,7 @@ export default function StudentOverviewPage() {
               const x =
                 graphPadding +
                 (index * (svgWidth - graphPadding * 2)) / Math.max(trendValues.length - 1, 1);
-              const normalized = (value - graphMin) / (graphMax - graphMin);
+              const normalized = graphMax === 0 ? 0 : (value - graphMin) / Math.max(graphMax - graphMin, 1);
               const y = svgHeight - graphPadding - normalized * (svgHeight - graphPadding * 2);
 
               return (

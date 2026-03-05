@@ -1,12 +1,14 @@
-﻿import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import DemoGlassCard from "../components/demo/DemoGlassCard";
 import StatusBadge from "../components/demo/StatusBadge";
 import {
-  STUDENT_REVIEW_DRAFT_STORAGE_KEY,
-  STUDENT_SUBMISSIONS_STORAGE_KEY,
-} from "../components/student/constants";
+  createSubmission,
+  deleteSubmission,
+  listSubmissions,
+  updateSubmission,
+  type SubmissionRecord,
+} from "../lib/api";
 import {
   BUTTON_INTERACTIVE_CLASS,
   GLASS_INTERACTIVE_CLASS,
@@ -28,7 +30,6 @@ const TECH_SUGGESTIONS = [
 ];
 
 const MAX_TECH_TAGS = 8;
-const MAX_ZIP_BYTES = 20 * 1024 * 1024;
 
 interface SubmitFormState {
   projectTitle: string;
@@ -36,7 +37,6 @@ interface SubmitFormState {
   rollNumber: string;
   techInput: string;
   techStack: string[];
-  zipFile: File | null;
   githubLink: string;
   liveDemoUrl: string;
 }
@@ -49,26 +49,6 @@ interface SubmitValidationState {
   liveDemoError: string;
 }
 
-interface LocalSubmissionRecord {
-  id: string;
-  projectTitle: string;
-  submittedAt: string;
-  status: "Under Review";
-  githubLink: string;
-  originality: number;
-  plagiarism: number;
-}
-
-interface StudentReviewDraft {
-  studentName?: string;
-  rollNumber: string;
-  branch: string;
-  projectTitle: string;
-  githubRepo: string;
-  liveLink: string;
-  description?: string;
-}
-
 type FieldKey = "projectTitle" | "branch" | "rollNumber" | "githubLink" | "liveDemoUrl";
 type TouchedState = Partial<Record<FieldKey, boolean>>;
 
@@ -79,7 +59,6 @@ function createInitialFormState(): SubmitFormState {
     rollNumber: "",
     techInput: "",
     techStack: [],
-    zipFile: null,
     githubLink: "",
     liveDemoUrl: "",
   };
@@ -90,9 +69,6 @@ function truncateText(value: string, maxLength: number) {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
-function formatFileSizeInMb(file: File) {
-  return `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
-}
 
 function getValidationState(formState: SubmitFormState): SubmitValidationState {
   const title = formState.projectTitle.trim();
@@ -141,19 +117,38 @@ function getValidationState(formState: SubmitFormState): SubmitValidationState {
   };
 }
 
-function createDeterministicScores(title: string) {
-  const cleanedTitle = title.trim().toLowerCase();
-  let hash = 0;
+function toReadableStatus(status: SubmissionRecord["status"]) {
+  if (status === "done" || status === "completed") return "Completed";
+  if (status === "submitted") return "Submitted";
+  if (status === "queued") return "Queued";
+  if (status === "processing") return "Processing";
+  if (status === "failed") return "Failed";
+  return "Draft";
+}
 
-  for (let i = 0; i < cleanedTitle.length; i += 1) {
-    hash = (hash * 31 + cleanedTitle.charCodeAt(i)) >>> 0;
+function toStatusBadgeTone(status: SubmissionRecord["status"]) {
+  if (status === "done" || status === "completed") return "good" as const;
+  if (status === "failed") return "danger" as const;
+  if (status === "draft") return "neutral" as const;
+  return "warning" as const;
+}
+
+function buildSubmissionDescription(formState: SubmitFormState) {
+  const parts: string[] = [];
+
+  if (formState.rollNumber.trim()) {
+    parts.push(`Roll: ${formState.rollNumber.trim()}`);
   }
 
-  const originality = 62 + (hash % 34);
-  return {
-    originality,
-    plagiarism: 100 - originality,
-  };
+  if (formState.techStack.length > 0) {
+    parts.push(`Tech: ${formState.techStack.join(", ")}`);
+  }
+
+  if (formState.liveDemoUrl.trim()) {
+    parts.push(`Live: ${formState.liveDemoUrl.trim()}`);
+  }
+
+  return parts.length > 0 ? parts.join(" | ") : undefined;
 }
 
 function SectionHint({ title, hint }: { title: string; hint: string }) {
@@ -171,24 +166,22 @@ function SectionHint({ title, hint }: { title: string; hint: string }) {
 }
 
 export default function StudentDemoPage() {
-  const navigate = useNavigate();
   const [formState, setFormState] = useState<SubmitFormState>(createInitialFormState);
   const [touched, setTouched] = useState<TouchedState>({});
   const [didAttemptSubmit, setDidAttemptSubmit] = useState(false);
   const [techFeedback, setTechFeedback] = useState("");
-  const [zipError, setZipError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessState, setShowSuccessState] = useState(false);
-  const [submissions, setSubmissions] = useState<LocalSubmissionRecord[]>([]);
-  const [hasLoadedSubmissions, setHasLoadedSubmissions] = useState(false);
+  const [submissions, setSubmissions] = useState<SubmissionRecord[]>([]);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(true);
+  const [submissionError, setSubmissionError] = useState("");
+  const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
 
-  const submitTimeoutRef = useRef<number | null>(null);
   const projectTitleRef = useRef<HTMLInputElement | null>(null);
   const branchRef = useRef<HTMLSelectElement | null>(null);
   const rollNumberRef = useRef<HTMLInputElement | null>(null);
   const githubLinkRef = useRef<HTMLInputElement | null>(null);
   const liveDemoRef = useRef<HTMLInputElement | null>(null);
-  const zipInputRef = useRef<HTMLInputElement | null>(null);
 
   const validation = useMemo(() => getValidationState(formState), [formState]);
   const isFormValid =
@@ -218,9 +211,17 @@ export default function StudentDemoPage() {
     if (rollLooksGood) score += 25;
     if (branchLooksGood) score += 20;
     if (showGithubValid) score += 15;
-    if (!validation.liveDemoError) score += 15;
+    if (formState.liveDemoUrl.trim() && !validation.liveDemoError) score += 15;
     return Math.min(score, 100);
-  }, [branchLooksGood, formState.githubLink, projectLooksGood, rollLooksGood, showGithubValid, validation.liveDemoError]);
+  }, [
+    branchLooksGood,
+    formState.githubLink,
+    formState.liveDemoUrl,
+    projectLooksGood,
+    rollLooksGood,
+    showGithubValid,
+    validation.liveDemoError,
+  ]);
 
   const hasRequiredFieldsValid =
     !validation.projectTitleError &&
@@ -230,72 +231,25 @@ export default function StudentDemoPage() {
   const previewStatusLabel = hasRequiredFieldsValid ? "Ready to submit" : "Missing required fields";
   const recentSubmissions = useMemo(() => submissions.slice(0, 5), [submissions]);
 
-  useEffect(() => {
+  const loadSubmissions = async () => {
+    setIsLoadingSubmissions(true);
+    setSubmissionError("");
+
     try {
-      const storedValue = localStorage.getItem(STUDENT_SUBMISSIONS_STORAGE_KEY);
-      if (!storedValue) return;
-
-      const parsed = JSON.parse(storedValue) as unknown;
-      if (Array.isArray(parsed)) {
-        const normalized: LocalSubmissionRecord[] = parsed
-          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-          .map((item, index) => {
-            const projectTitle =
-              typeof item.projectTitle === "string" && item.projectTitle.trim()
-                ? item.projectTitle
-                : "Untitled Project";
-            const fallbackScores = createDeterministicScores(projectTitle);
-            const originality =
-              typeof item.originality === "number" &&
-              Number.isFinite(item.originality) &&
-              item.originality >= 0 &&
-              item.originality <= 100
-                ? Math.round(item.originality)
-                : fallbackScores.originality;
-            const plagiarism =
-              typeof item.plagiarism === "number" &&
-              Number.isFinite(item.plagiarism) &&
-              item.plagiarism >= 0 &&
-              item.plagiarism <= 100
-                ? Math.round(item.plagiarism)
-                : 100 - originality;
-
-            return {
-              id:
-                typeof item.id === "string" && item.id.trim()
-                  ? item.id
-                  : `local-${index}-${projectTitle.length}`,
-              projectTitle,
-              submittedAt:
-                typeof item.submittedAt === "string" && item.submittedAt.trim()
-                  ? item.submittedAt
-                  : new Date().toLocaleString(),
-              status: "Under Review",
-              githubLink: typeof item.githubLink === "string" ? item.githubLink : "",
-              originality,
-              plagiarism,
-            };
-          });
-        setSubmissions(normalized);
-      }
-    } catch {
-      localStorage.removeItem(STUDENT_SUBMISSIONS_STORAGE_KEY);
+      const response = await listSubmissions();
+      setSubmissions(response.submissions);
+    } catch (requestError) {
+      setSubmissionError(
+        requestError instanceof Error ? requestError.message : "Unable to load submissions.",
+      );
+      setSubmissions([]);
     } finally {
-      setHasLoadedSubmissions(true);
+      setIsLoadingSubmissions(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    if (!hasLoadedSubmissions) return;
-    localStorage.setItem(STUDENT_SUBMISSIONS_STORAGE_KEY, JSON.stringify(submissions));
-  }, [hasLoadedSubmissions, submissions]);
-
-  useEffect(() => {
-    return () => {
-      if (submitTimeoutRef.current) {
-        window.clearTimeout(submitTimeoutRef.current);
-      }
-    };
+    void loadSubmissions();
   }, []);
 
   const markFieldTouched = (field: FieldKey) => {
@@ -345,42 +299,6 @@ export default function StudentDemoPage() {
     }));
   };
 
-  const handleZipChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-
-    if (!file) {
-      setZipError("");
-      setFormState((current) => ({ ...current, zipFile: null }));
-      return;
-    }
-
-    const hasZipExtension = file.name.toLowerCase().endsWith(".zip");
-    if (!hasZipExtension) {
-      setZipError("Only .zip files are allowed.");
-      setFormState((current) => ({ ...current, zipFile: null }));
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > MAX_ZIP_BYTES) {
-      setZipError("ZIP file must be 20MB or smaller.");
-      setFormState((current) => ({ ...current, zipFile: null }));
-      event.target.value = "";
-      return;
-    }
-
-    setZipError("");
-    setFormState((current) => ({ ...current, zipFile: file }));
-  };
-
-  const clearZipFile = () => {
-    setZipError("");
-    setFormState((current) => ({ ...current, zipFile: null }));
-    if (zipInputRef.current) {
-      zipInputRef.current.value = "";
-    }
-  };
-
   const focusInvalidField = (field: FieldKey) => {
     const refs: Record<FieldKey, HTMLInputElement | HTMLSelectElement | null> = {
       projectTitle: projectTitleRef.current,
@@ -404,7 +322,15 @@ export default function StudentDemoPage() {
     return null;
   };
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const resetForm = () => {
+    setFormState(createInitialFormState());
+    setDidAttemptSubmit(false);
+    setTouched({});
+    setTechFeedback("");
+    setEditingSubmissionId(null);
+  };
+
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setDidAttemptSubmit(true);
     setTouched({
@@ -423,56 +349,73 @@ export default function StudentDemoPage() {
       return;
     }
 
-    if (submitTimeoutRef.current) {
-      window.clearTimeout(submitTimeoutRef.current);
-    }
-
     setIsSubmitting(true);
     setShowSuccessState(false);
+    setSubmissionError("");
 
-    const delay = 800 + Math.floor(Math.random() * 401);
-    submitTimeoutRef.current = window.setTimeout(() => {
-      const normalizedTitle = formState.projectTitle.trim();
-      const scores = createDeterministicScores(normalizedTitle);
-      const submissionItem: LocalSubmissionRecord = {
-        id:
-          typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        projectTitle: normalizedTitle,
-        submittedAt: new Date().toLocaleString(),
-        status: "Under Review",
-        githubLink: formState.githubLink.trim(),
-        originality: scores.originality,
-        plagiarism: scores.plagiarism,
+    try {
+      const payload = {
+        title: formState.projectTitle.trim(),
+        repoUrl: formState.githubLink.trim(),
+        branch: formState.branch.trim() || "main",
+        description: buildSubmissionDescription(formState),
       };
 
-      const reviewDraft: StudentReviewDraft = {
-        rollNumber: formState.rollNumber.trim(),
-        branch: formState.branch.trim(),
-        projectTitle: normalizedTitle,
-        githubRepo: formState.githubLink.trim(),
-        liveLink: formState.liveDemoUrl.trim(),
-      };
-
-      localStorage.setItem(STUDENT_REVIEW_DRAFT_STORAGE_KEY, JSON.stringify(reviewDraft));
-
-      setSubmissions((current) => [submissionItem, ...current]);
-      setIsSubmitting(false);
-      setShowSuccessState(true);
-      setDidAttemptSubmit(false);
-      setTouched({});
-      setZipError("");
-      setTechFeedback("");
-      setFormState(createInitialFormState());
-
-      if (zipInputRef.current) {
-        zipInputRef.current.value = "";
+      if (editingSubmissionId) {
+        await updateSubmission(editingSubmissionId, payload);
+      } else {
+        await createSubmission(payload);
       }
 
-      submitTimeoutRef.current = null;
-      navigate("/student/review");
-    }, delay);
+      await loadSubmissions();
+      setShowSuccessState(true);
+      resetForm();
+    } catch (requestError) {
+      setSubmissionError(
+        requestError instanceof Error ? requestError.message : "Unable to save submission.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onEditSubmission = (submission: SubmissionRecord) => {
+    const nextBranch = BRANCH_OPTIONS.includes(submission.branch) ? submission.branch : "";
+
+    setEditingSubmissionId(submission.id);
+    setShowSuccessState(false);
+    setSubmissionError("");
+    setFormState((current) => ({
+      ...current,
+      projectTitle: submission.title,
+      branch: nextBranch,
+      githubLink: submission.repoUrl,
+      liveDemoUrl: "",
+      techInput: "",
+      techStack: [],
+    }));
+
+    projectTitleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    projectTitleRef.current?.focus();
+  };
+
+  const onDeleteSubmission = async (id: string) => {
+    if (isSubmitting) return;
+
+    setSubmissionError("");
+
+    try {
+      await deleteSubmission(id);
+      setSubmissions((current) => current.filter((item) => item.id !== id));
+
+      if (editingSubmissionId === id) {
+        resetForm();
+      }
+    } catch (requestError) {
+      setSubmissionError(
+        requestError instanceof Error ? requestError.message : "Unable to delete submission.",
+      );
+    }
   };
 
   const getInputClass = (hasError: boolean, shouldGlow = true) =>
@@ -498,14 +441,14 @@ export default function StudentDemoPage() {
               Student Project Submission
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              Submit your project package for plagiarism screening and AI review.
+              Submit your project repository for tracking and future AI review.
             </p>
           </div>
 
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
             <SectionHint
               title="Project Basics"
-              hint="Add project identity and technical details for accurate AI checks."
+              hint="Add project identity and technical details for accurate processing."
             />
 
             <label className="flex flex-col gap-1.5 sm:col-span-2">
@@ -639,40 +582,9 @@ export default function StudentDemoPage() {
               ) : null}
             </label>
 
-            <label className="flex flex-col gap-1.5 sm:col-span-2">
-              <span className="text-sm font-medium text-slate-700">Upload Project ZIP</span>
-              <input
-                ref={zipInputRef}
-                type="file"
-                accept=".zip"
-                onChange={handleZipChange}
-                className={`rounded-2xl border border-white/60 bg-white/55 px-4 py-2.5 text-sm text-slate-700 file:mr-3 file:rounded-xl file:border-0 file:bg-blue-100/90 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 ${INPUT_GLOW_CLASS}`}
-                disabled={isSubmitting}
-              />
-              {zipError ? <p className="text-xs font-medium text-rose-600">{zipError}</p> : null}
-              {formState.zipFile ? (
-                <div className="inline-flex items-center gap-2 self-start rounded-full border border-blue-200/80 bg-blue-50/70 px-3 py-1 text-xs font-medium text-blue-700">
-                  <span>
-                    {formState.zipFile.name} ({formatFileSizeInMb(formState.zipFile)})
-                  </span>
-                  <span className="rounded-full border border-emerald-200/75 bg-emerald-50/75 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                    Ready
-                  </span>
-                  <button
-                    type="button"
-                    onClick={clearZipFile}
-                    className={`rounded-full border border-blue-200/80 bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-blue-700 ${BUTTON_INTERACTIVE_CLASS}`}
-                    disabled={isSubmitting}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : null}
-            </label>
-
             <SectionHint
               title="Links & Validation"
-              hint="Repository and demo links improve automated report confidence."
+              hint="Repository link is required for submission records."
             />
 
             <label className="flex flex-col gap-1.5 sm:col-span-2">
@@ -714,7 +626,11 @@ export default function StudentDemoPage() {
               ) : null}
             </label>
 
-            <div className="pt-1 sm:col-span-2">
+            {submissionError ? (
+              <p className="sm:col-span-2 text-sm font-medium text-rose-600">{submissionError}</p>
+            ) : null}
+
+            <div className="pt-1 sm:col-span-2 flex items-center gap-2">
               <button
                 type="submit"
                 disabled={isSubmitDisabled}
@@ -730,12 +646,24 @@ export default function StudentDemoPage() {
                       <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.35)" strokeWidth="3" />
                       <path d="M22 12a10 10 0 00-10-10" stroke="white" strokeWidth="3" strokeLinecap="round" />
                     </svg>
-                    Submitting...
+                    {editingSubmissionId ? "Updating..." : "Submitting..."}
                   </>
+                ) : editingSubmissionId ? (
+                  "Update Submission"
                 ) : (
                   "Submit Project"
                 )}
               </button>
+
+              {editingSubmissionId ? (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className={`rounded-2xl border border-white/70 bg-white/60 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white/80 ${BUTTON_INTERACTIVE_CLASS}`}
+                >
+                  Cancel Edit
+                </button>
+              ) : null}
             </div>
           </form>
 
@@ -749,27 +677,19 @@ export default function StudentDemoPage() {
                 transition={{ duration: 0.22 }}
               >
                 <h2 className="text-sm font-semibold text-emerald-800">
-                  Submission Received {"\u2705"}
+                  Submission Saved
                 </h2>
                 <p className="mt-1 text-sm text-emerald-700">
-                  AI analysis will start soon. Estimated time: 2-5 minutes.
+                  Your submission record has been saved successfully.
                 </p>
                 <div className="mt-3 grid gap-2 text-xs text-slate-700">
                   <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-white/55 px-3 py-2">
-                    <span>Submission Received</span>
+                    <span>Submission Saved</span>
                     <StatusBadge label="Done" tone="good" />
                   </div>
                   <div className="flex items-center justify-between rounded-xl border border-blue-200/70 bg-white/55 px-3 py-2">
-                    <span>AI Analysis Running</span>
-                    <StatusBadge label="Active" tone="neutral" />
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-amber-200/70 bg-white/55 px-3 py-2">
-                    <span>Teacher Review</span>
-                    <StatusBadge label="Pending" tone="warning" />
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white/55 px-3 py-2">
-                    <span>Completed</span>
-                    <StatusBadge label="Pending" tone="neutral" />
+                    <span>Status</span>
+                    <StatusBadge label="submitted" tone="warning" />
                   </div>
                 </div>
               </motion.div>
@@ -842,12 +762,6 @@ export default function StudentDemoPage() {
               </dd>
             </div>
             <div>
-              <dt className="font-semibold text-slate-500">ZIP</dt>
-              <dd className="mt-1 text-slate-800">
-                {formState.zipFile ? formState.zipFile.name : "Not attached"}
-              </dd>
-            </div>
-            <div>
               <dt className="font-semibold text-slate-500">Status</dt>
               <dd className="mt-1">
                 <StatusBadge label={previewStatusLabel} tone={hasRequiredFieldsValid ? "good" : "warning"} />
@@ -863,7 +777,11 @@ export default function StudentDemoPage() {
           <StatusBadge label={`${recentSubmissions.length} Showing`} tone="neutral" />
         </div>
 
-        {recentSubmissions.length ? (
+        {submissionError ? <p className="mt-3 text-sm text-rose-600">{submissionError}</p> : null}
+
+        {isLoadingSubmissions ? (
+          <p className="mt-3 text-sm text-slate-600">Loading submissions...</p>
+        ) : recentSubmissions.length ? (
           <div className="mt-3 grid gap-3">
             {recentSubmissions.map((submission) => (
               <div
@@ -871,38 +789,57 @@ export default function StudentDemoPage() {
                 className={`group rounded-2xl border border-white/65 bg-white/45 px-4 py-3 ${LIST_ROW_INTERACTIVE_CLASS}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">{submission.projectTitle}</p>
-                  <StatusBadge label={submission.status} tone="warning" />
+                  <p className="text-sm font-semibold text-slate-900">{submission.title}</p>
+                  <StatusBadge
+                    label={toReadableStatus(submission.status)}
+                    tone={toStatusBadgeTone(submission.status)}
+                  />
                 </div>
-                <p className="mt-1 text-xs text-slate-600">{submission.submittedAt}</p>
+                <p className="mt-1 text-xs text-slate-600">{new Date(submission.createdAt).toLocaleString()}</p>
+                <p className="mt-1 text-xs text-slate-600">Branch: {submission.branch || "main"}</p>
                 <p className="mt-1 text-xs text-slate-600">
                   GitHub:{" "}
-                  {submission.githubLink ? (
-                    <a
-                      href={submission.githubLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium text-blue-700 hover:text-blue-800"
-                    >
-                      {truncateText(submission.githubLink, 48)}
-                    </a>
-                  ) : (
-                    <span className="font-medium text-slate-500">Not provided</span>
-                  )}
+                  <a
+                    href={submission.repoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-blue-700 hover:text-blue-800"
+                  >
+                    {truncateText(submission.repoUrl, 48)}
+                  </a>
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                  <StatusBadge label={`Originality ${submission.originality}%`} tone="good" />
-                  <StatusBadge label={`Plagiarism ${submission.plagiarism}%`} tone="warning" />
+
+                {submission.description ? (
+                  <p className="mt-1 text-xs text-slate-600">{truncateText(submission.description, 84)}</p>
+                ) : null}
+
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => onEditSubmission(submission)}
+                    className={`rounded-lg border border-blue-200/80 bg-blue-50/80 px-2.5 py-1.5 font-semibold text-blue-700 ${BUTTON_INTERACTIVE_CLASS}`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onDeleteSubmission(submission.id)}
+                    className={`rounded-lg border border-rose-200/80 bg-rose-50/80 px-2.5 py-1.5 font-semibold text-rose-700 ${BUTTON_INTERACTIVE_CLASS}`}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <p className="mt-3 text-sm text-slate-600">
-            No submissions yet. Your latest 5 successful submissions will appear here.
+            No submissions yet. Your latest submissions will appear here.
           </p>
         )}
       </DemoGlassCard>
     </motion.main>
   );
 }
+
+

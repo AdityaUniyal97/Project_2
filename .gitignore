@@ -1,2 +1,6 @@
 node_modules
-.env.example
+dist
+.env
+.env.local
+server/.env
+server/dist

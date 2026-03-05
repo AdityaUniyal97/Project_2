@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import SignInForm from "./SignInForm";
-import SignUpForm from "./SignUpForm";
+import LoginCard from "./LoginCard";
+import SignupCard from "./SignupCard";
 
 export type AuthMode = "signin" | "signup";
 
@@ -52,8 +52,8 @@ export default function AuthFlipCard({ authMode, onModeChange }: Props) {
             }`}
             aria-hidden={isSignup}
           >
-            <div ref={signInRef} className="auth-glass-card p-8 sm:p-10">
-              <SignInForm onSwitchToSignup={() => onModeChange("signup")} />
+            <div ref={signInRef}>
+              <LoginCard onSignupClick={() => onModeChange("signup")} />
             </div>
           </div>
 
@@ -63,8 +63,8 @@ export default function AuthFlipCard({ authMode, onModeChange }: Props) {
             }`}
             aria-hidden={!isSignup}
           >
-            <div ref={signUpRef} className="auth-glass-card p-8 sm:p-10">
-              <SignUpForm onSwitchToSignin={() => onModeChange("signin")} />
+            <div ref={signUpRef}>
+              <SignupCard onBackToLogin={() => onModeChange("signin")} />
             </div>
           </div>
         </motion.div>

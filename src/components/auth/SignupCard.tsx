@@ -1,28 +1,83 @@
 import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 
+import { register } from "../../lib/authClient";
+
 interface Props {
   onBackToLogin: () => void;
 }
 
 type UserType = "student" | "teacher";
 
+function getAuthErrorMessage(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (!message) return fallback;
+  if (message === "Route not found.") {
+    return "Authentication endpoint is unavailable.";
+  }
+  return message;
+}
+
 export default function SignupCard({ onBackToLogin }: Props) {
   const [userType, setUserType] = useState<UserType>("student");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
+
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedName || normalizedName.length < 2) {
+      setError("Name must be at least 2 characters.");
+      return;
+    }
+
+    if (!normalizedEmail) {
+      setError("Email is required.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (!acceptedTerms) {
+      setError("Please accept the terms to continue.");
+      return;
+    }
+
     setSubmitting(true);
     setIsSuccess(false);
-    // simulate network request and show success then return to sign in
-    setTimeout(() => {
+    setError("");
+
+    try {
+      await register({
+        name: normalizedName,
+        email: normalizedEmail,
+        password,
+        role: userType,
+      });
+
+      setName("");
+      setEmail("");
+      setPassword("");
+      setAcceptedTerms(false);
       setSubmitting(false);
       setIsSuccess(true);
       setTimeout(() => onBackToLogin(), 500);
-    }, 850);
+    } catch (requestError) {
+      setSubmitting(false);
+      setError(getAuthErrorMessage(requestError, "Unable to create account."));
+    }
   };
 
   return (
@@ -80,6 +135,8 @@ export default function SignupCard({ onBackToLogin }: Props) {
           </label>
           <input
             type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             placeholder="Enter your full name"
             disabled={submitting}
             className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
@@ -93,6 +150,8 @@ export default function SignupCard({ onBackToLogin }: Props) {
           </label>
           <input
             type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             placeholder="name@company.com"
             disabled={submitting}
             className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
@@ -106,6 +165,8 @@ export default function SignupCard({ onBackToLogin }: Props) {
           </label>
           <input
             type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
             placeholder="Create a strong password"
             disabled={submitting}
             className="w-full rounded-xl border border-slate-200/80 bg-white/70 px-4 py-3 text-[14px] text-slate-700 placeholder-slate-400 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-200/50 disabled:opacity-70"
@@ -184,6 +245,8 @@ export default function SignupCard({ onBackToLogin }: Props) {
           <input
             type="checkbox"
             id="terms"
+            checked={acceptedTerms}
+            onChange={(event) => setAcceptedTerms(event.target.checked)}
             disabled={submitting}
             className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 accent-blue-600 focus:ring-blue-300"
           />
@@ -191,6 +254,8 @@ export default function SignupCard({ onBackToLogin }: Props) {
             I agree to the Terms of Service and Privacy Policy
           </label>
         </div>
+
+        {error ? <p className="text-[13px] text-rose-600">{error}</p> : null}
 
         {/* Submit */}
         <motion.button
