@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from "react";
+import { flushSync } from "react-dom";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
@@ -44,7 +45,7 @@ export default function LoginCard({ onSignupClick }: Props) {
 
     try {
       const response = await login({ email: normalizedEmail, password });
-      setUser(response.user);
+      flushSync(() => setUser(response.user));
       navigate(getDashboardPathForRole(response.user.role), { replace: true });
     } catch (requestError) {
       setError(getAuthErrorMessage(requestError, "Login failed."));
@@ -61,7 +62,7 @@ export default function LoginCard({ onSignupClick }: Props) {
 
     try {
       const response = await devLogin({ role });
-      setUser(response.user);
+      flushSync(() => setUser(response.user));
       navigate(getDashboardPathForRole(response.user.role), { replace: true });
     } catch (requestError) {
       setError(getAuthErrorMessage(requestError, "Dev login failed."));

@@ -65,6 +65,12 @@ export interface TeacherSubmissionRecord {
   aiScore?: number | null;
   aiSummary?: string | null;
   aiFlags?: string[];
+  aiRiskLevel?: string | null;
+  aiRecommendation?: string | null;
+  aiConfidence?: number | null;
+  aiViva?: string[];
+  aiChallenge?: Record<string, unknown> | null;
+  aiEvidence?: Record<string, unknown> | null;
   reviewStartedAt?: string | null;
   reviewCompletedAt?: string | null;
   assignedTeacherId?: string | null;
@@ -173,6 +179,14 @@ export function getReviewStatus(submissionId: string) {
     aiScore: number | null;
     aiSummary: string | null;
     aiFlags: string[];
+    aiRiskLevel: string | null;
+    aiRecommendation: string | null;
+    aiConfidence: number | null;
+    aiViva: string[];
+    aiChallenge: Record<string, unknown> | null;
+    aiEvidence: Record<string, unknown> | null;
+    reviewStartedAt: string | null;
+    reviewCompletedAt: string | null;
   }>(`/api/review/status/${submissionId}`, {
     method: "GET",
   });
@@ -241,4 +255,33 @@ export function assignTeacherToSubmission(submissionId: string, teacherId: strin
       body: JSON.stringify({ teacherId }),
     },
   );
+}
+
+export interface ChallengeExecutionResult {
+  challenge_id?: string;
+  success: boolean;
+  passed_tests: number;
+  total_tests: number;
+  test_results: Array<{
+    test_case: number;
+    passed: boolean;
+    input: string;
+    expected: string;
+    actual?: string;
+    error?: string;
+  }>;
+  errors?: string;
+  verdict: string;
+}
+
+export function executeChallenge(payload: {
+  challenge_id?: string;
+  student_code: string;
+  language: string;
+  test_cases: Array<{ input: string; expected_output: string }>;
+}) {
+  return apiRequest<ChallengeExecutionResult>("/api/review/challenge/execute", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }

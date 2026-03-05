@@ -173,8 +173,8 @@ export default function TeacherSubmissionsPage() {
 
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-600">
                     <span>{toReadableDate(submission.submittedAt)}</span>
-                    <span>Originality: {submission.originalityPercent}%</span>
-                    <span>AI confidence: {submission.aiConfidencePercent}%</span>
+                    <span>Authenticity: {submission.originalityPercent}%</span>
+                    <span>Confidence: {Math.round(submission.aiConfidence)}%</span>
                     {reviewedMap[submission.id] ? (
                       <span className="rounded-full border border-blue-200/80 bg-blue-50/80 px-2 py-0.5 font-semibold text-blue-700">
                         Reviewed
@@ -204,10 +204,15 @@ export default function TeacherSubmissionsPage() {
                     </button>
                     <button
                       type="button"
+                      disabled={submission.status === "Completed"}
                       onClick={() => updateSubmissionStatus(submission.id, "Completed")}
-                      className={`rounded-lg border border-emerald-200/75 bg-emerald-50/75 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100/85 ${BUTTON_INTERACTIVE_CLASS}`}
+                      className={`rounded-lg border border-emerald-200/75 px-3 py-1.5 text-xs font-semibold transition ${
+                        submission.status === "Completed"
+                          ? "bg-emerald-100/90 text-emerald-500 cursor-default opacity-70"
+                          : `bg-emerald-50/75 text-emerald-700 hover:bg-emerald-100/85 ${BUTTON_INTERACTIVE_CLASS}`
+                      }`}
                     >
-                      Mark Completed
+                      {submission.status === "Completed" ? "✓ Completed" : "Mark Completed"}
                     </button>
                     <button
                       type="button"

@@ -18,7 +18,6 @@ import {
   type TeacherSubmissionRecord,
 } from "../../lib/api";
 import type {
-  DetectedSource,
   Submission,
   TeacherRiskLevel,
   TeacherSettingsState,
@@ -106,55 +105,21 @@ function inferBranch(rollNumber: string, techTags: string[]) {
   return "GEN";
 }
 
-function inferRiskLevel(
-  plagiarismPercent: number,
-  aiFlagCount: number,
-  status: ApiSubmissionStatus,
-): TeacherRiskLevel {
-  if (status === "failed") return "CRITICAL";
-
-  const signal = plagiarismPercent + aiFlagCount * 8;
-  if (signal >= 78) return "CRITICAL";
-  if (signal >= 56) return "HIGH";
-  if (signal >= 34) return "MEDIUM";
-  return "LOW";
+function mapRiskLevel(raw: string | null | undefined): TeacherRiskLevel {
+  const upper = (raw ?? "").toUpperCase();
+  if (upper === "CRITICAL" || upper === "HIGH") return "HIGH";
+  if (upper === "SUSPICIOUS" || upper === "MONITOR" || upper === "MEDIUM") return "MEDIUM";
+  if (upper === "CLEAR" || upper === "LOW" || upper === "VERIFIED") return "LOW";
+  return "MEDIUM";
 }
 
-function createVivaQuestions(submissionId: string, topicTag: string): VivaQuestion[] {
-  return [
-    {
-      id: `${submissionId}-v1`,
-      topicTag,
-      difficulty: "Medium",
-      question: "Walk through your architecture and core module boundaries.",
-      expectedTalkingPoints: "Design choices, tradeoffs, and why this structure was selected.",
-    },
-    {
-      id: `${submissionId}-v2`,
-      topicTag: "Testing",
-      difficulty: "Easy",
-      question: "How did you verify correctness and handle edge cases?",
-      expectedTalkingPoints: "Test strategy, critical edge cases, and validation process.",
-    },
-    {
-      id: `${submissionId}-v3`,
-      topicTag: "Security",
-      difficulty: "Hard",
-      question: "Which top security risks remain and how would you mitigate them?",
-      expectedTalkingPoints: "Threat model, current mitigations, and improvement roadmap.",
-    },
-  ];
-}
-
-function deriveDetectedSources(aiFlags: string[]): DetectedSource[] {
-  if (aiFlags.length === 0) {
-    return [{ name: "No major similarity flags", percent: 12 }];
-  }
-
-  const cappedFlags = aiFlags.slice(0, 3);
-  return cappedFlags.map((flag, index) => ({
-    name: flag,
-    percent: clamp(46 - index * 12, 14, 46),
+function createVivaQuestionsFromAi(submissionId: string, aiViva: string[]): VivaQuestion[] {
+  return aiViva.map((q, i) => ({
+    id: `${submissionId}-v${i + 1}`,
+    topicTag: "AI Generated",
+    difficulty: (i === 0 ? "Medium" : i === 1 ? "Easy" : "Hard") as VivaQuestion["difficulty"],
+    question: q,
+    expectedTalkingPoints: "",
   }));
 }
 
@@ -168,33 +133,29 @@ function mapTeacherSubmissionRecord(record: TeacherSubmissionRecord): Submission
   const techTags = Array.isArray(record.techTags) ? record.techTags : [];
   const rollNumber = record.rollNumber?.trim() || "NA";
   const status = toTeacherStatus(record.status);
-  const originalityPercent = clamp(
-    Math.round(
-      typeof record.aiScore === "number"
-        ? record.aiScore
-        : status === "Completed"
-          ? 76
-          : 61,
-    ),
-    0,
-    100,
-  );
-  const plagiarismPercent = clamp(100 - originalityPercent, 0, 100);
-  const structuralOverlapPercent = clamp(
-    Math.round(plagiarismPercent * 0.72 + (record.aiFlags?.length ?? 0) * 3),
-    0,
-    100,
-  );
-  const aiConfidencePercent = clamp(
-    Math.round(58 + (record.aiFlags?.length ?? 0) * 7 + (status === "Completed" ? 8 : 0)),
-    0,
-    100,
-  );
-  const commitRiskScore = Number(
-    Math.min(10, 1.8 + structuralOverlapPercent / 18 + (record.aiFlags?.length ?? 0) * 0.65).toFixed(1),
-  );
-  const riskLevel = inferRiskLevel(plagiarismPercent, record.aiFlags?.length ?? 0, record.status);
-  const primaryTopic = techTags[0] ?? "Architecture";
+
+  // Real AI data from engine (via backend)
+  const aiScore = typeof record.aiScore === "number" ? record.aiScore : 0;
+  const aiSummary = record.aiSummary?.trim() || "";
+  const aiFlags = record.aiFlags ?? [];
+  const aiRiskLevel = record.aiRiskLevel ?? "";
+  const aiRecommendation = record.aiRecommendation ?? "";
+  const aiConfidence = typeof record.aiConfidence === "number" ? record.aiConfidence : 0;
+  const aiViva = record.aiViva ?? [];
+  const aiChallenge = record.aiChallenge ?? null;
+  const aiEvidence = record.aiEvidence ?? null;
+
+  // Extract sub-scores from evidence
+  const ev = (aiEvidence ?? {}) as Record<string, unknown>;
+  const similarityScore = typeof ev.similarity_score === "number" ? ev.similarity_score : 0;
+  const commitRiskScore = typeof ev.commit_risk_score === "number" ? ev.commit_risk_score : 0;
+  const aiDetectionProbability = typeof ev.ai_detection_probability === "number" ? ev.ai_detection_probability : 0;
+  const codeQualityScore = typeof ev.code_quality_score === "number" ? ev.code_quality_score : 0;
+
+  const originalityPercent = clamp(Math.round(aiScore), 0, 100);
+  const plagiarismPercent = clamp(Math.round(similarityScore * 100), 0, 100);
+
+  const riskLevel = mapRiskLevel(aiRiskLevel);
 
   return {
     id,
@@ -205,21 +166,30 @@ function mapTeacherSubmissionRecord(record: TeacherSubmissionRecord): Submission
     submittedAt: record.createdAt,
     status,
     riskLevel,
-    originalityPercent,
-    plagiarismPercent,
-    structuralOverlapPercent,
-    aiConfidencePercent,
-    commitRiskScore,
     projectType: inferProjectType(techTags),
     liveDemoUrl: record.liveDemoUrl,
     githubUrl: record.repoUrl,
-    summaryNarrative:
-      record.aiSummary?.trim() ||
-      `Submission is currently ${status === "Completed" ? "completed" : "under review"} with ${
-        record.aiFlags?.length ?? 0
-      } signal flag(s).`,
-    detectedSources: deriveDetectedSources(record.aiFlags ?? []),
-    vivaQuestions: createVivaQuestions(id, primaryTopic),
+
+    // Pass-through AI fields (exact same data as student side)
+    aiScore,
+    aiSummary: aiSummary || `Submission is currently ${status === "Completed" ? "completed" : "under review"}.`,
+    aiFlags,
+    aiRiskLevel,
+    aiRecommendation,
+    aiConfidence,
+    aiViva,
+    aiChallenge,
+    aiEvidence,
+
+    // Derived convenience fields
+    originalityPercent,
+    plagiarismPercent,
+    similarityScore,
+    commitRiskScore,
+    aiDetectionProbability,
+    codeQualityScore,
+    summaryNarrative: aiSummary || `Submission is currently ${status === "Completed" ? "completed" : "under review"} with ${aiFlags.length} signal flag(s).`,
+    vivaQuestions: aiViva.length > 0 ? createVivaQuestionsFromAi(id, aiViva) : [],
   };
 }
 

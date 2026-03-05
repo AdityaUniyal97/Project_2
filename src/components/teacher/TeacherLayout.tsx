@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { flushSync } from "react-dom";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import AmbientInnerBackground, { type AmbientVariant } from "../ambient/AmbientInnerBackground";
 import DemoBackground from "../demo/DemoBackground";
@@ -68,7 +69,7 @@ export default function TeacherLayout() {
       localStorage.removeItem(key);
       sessionStorage.removeItem(key);
     });
-    setUser(null);
+    flushSync(() => setUser(null));
     navigate("/auth", { replace: true });
   };
 

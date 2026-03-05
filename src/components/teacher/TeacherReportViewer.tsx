@@ -158,9 +158,9 @@ export default function TeacherReportViewer({
   };
 
   const onCopyVivaPack = async () => {
-    const payload = submission.vivaQuestions
-      .map((question, index) => `${index + 1}. [${question.topicTag}] ${question.question}`)
-      .join("\n");
+    const payload = submission.aiViva.length > 0
+      ? submission.aiViva.map((q, i) => `${i + 1}. ${q}`).join("\n")
+      : submission.vivaQuestions.map((q, i) => `${i + 1}. [${q.topicTag}] ${q.question}`).join("\n");
 
     await onCopy(payload);
   };
@@ -170,21 +170,49 @@ export default function TeacherReportViewer({
       <div className="flex flex-wrap items-center gap-2">
         <TeacherRiskBadge level={submission.riskLevel} />
         <TeacherStatusBadge status={submission.status} />
+        {submission.aiRiskLevel ? (
+          <span className="rounded-full border border-slate-200/80 bg-slate-50/80 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+            {submission.aiRiskLevel}
+          </span>
+        ) : null}
+        {submission.aiRecommendation ? (
+          <span className="rounded-full border border-blue-200/80 bg-blue-50/80 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+            {submission.aiRecommendation.replace(/_/g, " ")}
+          </span>
+        ) : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {scoreTile("Originality", `${submission.originalityPercent}%`, "blue")}
-        {scoreTile("Structure Overlap", `${submission.structuralOverlapPercent}%`, "amber")}
-        {scoreTile("Commit Risk", `${submission.commitRiskScore.toFixed(1)}/10`, "rose")}
-        {scoreTile("AI Confidence", `${submission.aiConfidencePercent}%`, "slate")}
+        {scoreTile("Authenticity", `${submission.originalityPercent}%`, "blue")}
+        {scoreTile("Similarity", `${Math.round(submission.similarityScore * 100)}%`, "amber")}
+        {scoreTile("Commit Risk", `${Math.round(submission.commitRiskScore * 100)}%`, "rose")}
+        {scoreTile("AI Confidence", `${Math.round(submission.aiConfidence)}%`, "slate")}
       </div>
 
       <div className="rounded-xl border border-white/60 bg-white/45 px-4 py-3">
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-          Narrative Summary
+          AI Summary
         </p>
         <p className="mt-1 text-sm text-slate-700">{submission.summaryNarrative}</p>
       </div>
+
+      {submission.aiFlags.length > 0 && (
+        <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">
+            Flags ({submission.aiFlags.length})
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {submission.aiFlags.map((flag, i) => (
+              <span
+                key={`${flag}-${i}`}
+                className="rounded-full border border-amber-200/85 bg-amber-50/90 px-2.5 py-1 text-xs font-medium text-amber-800"
+              >
+                ⚠ {flag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Teacher Notes</span>
@@ -230,61 +258,39 @@ export default function TeacherReportViewer({
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-white/60 bg-white/45 p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Detected Sources</p>
-          <div className="mt-2 space-y-2">
-            {submission.detectedSources.map((source) => (
-              <div key={source.name}>
-                <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
-                  <span>{source.name}</span>
-                  <span className="font-semibold text-slate-700">{source.percent}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-white/70">
-                  <div
-                    className="h-2 rounded-full bg-gradient-to-r from-slate-500/85 to-blue-500/80"
-                    style={{ width: `${source.percent}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Score Breakdown</p>
+          <div className="mt-2 space-y-2 text-sm text-slate-700">
+            <div className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
+              Similarity: <span className="font-semibold">{Math.round(submission.similarityScore * 100)}%</span>
+            </div>
+            <div className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
+              Commit risk: <span className="font-semibold">{Math.round(submission.commitRiskScore * 100)}%</span>
+            </div>
+            <div className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
+              AI detection: <span className="font-semibold">{Math.round(submission.aiDetectionProbability * 100)}%</span>
+            </div>
+            <div className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
+              Code quality: <span className="font-semibold">{Math.round(submission.codeQualityScore * 100)}%</span>
+            </div>
           </div>
         </div>
 
         <div className="rounded-xl border border-white/60 bg-white/45 p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Overlap Breakdown</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Verdict Details</p>
           <div className="mt-2 space-y-2 text-sm text-slate-700">
             <div className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
-              Structural overlap: <span className="font-semibold">{submission.structuralOverlapPercent}%</span>
+              Authenticity score: <span className="font-semibold">{Math.round(submission.aiScore)}/100</span>
             </div>
             <div className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
-              Text similarity: <span className="font-semibold">{submission.plagiarismPercent}%</span>
+              Confidence: <span className="font-semibold">{Math.round(submission.aiConfidence)}%</span>
             </div>
             <div className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
-              Commit risk score: <span className="font-semibold">{submission.commitRiskScore.toFixed(1)}/10</span>
+              Risk level: <span className="font-semibold">{submission.aiRiskLevel || "N/A"}</span>
+            </div>
+            <div className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
+              Recommendation: <span className="font-semibold">{(submission.aiRecommendation || "N/A").replace(/_/g, " ")}</span>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-white/60 bg-white/45 p-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Commit Pattern Timeline</p>
-        <div className="mt-2 grid grid-cols-8 gap-2">
-          {Array.from({ length: 8 }, (_, index) => {
-            const value = Math.max(
-              18,
-              Math.round((submission.commitRiskScore * 9 + index * 11 + submission.originalityPercent) % 100),
-            );
-            return (
-              <div key={index} className="flex flex-col items-center gap-1">
-                <div className="flex h-20 w-full items-end rounded-lg bg-white/70 p-1">
-                  <div
-                    className="w-full rounded-md bg-gradient-to-t from-slate-500/80 to-cyan-400/80"
-                    style={{ height: `${value}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-slate-500">W{index + 1}</span>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>
@@ -303,66 +309,100 @@ export default function TeacherReportViewer({
         </button>
       </div>
 
-      {groupedViva.map(([topic, questions]) => {
-        const expanded = expandedTopic === topic;
-        return (
-          <div key={topic} className="overflow-hidden rounded-xl border border-white/60 bg-white/45">
-            <button
-              type="button"
-              onClick={() => setExpandedTopic((current) => (current === topic ? null : topic))}
-              className="flex w-full items-center justify-between px-3 py-2 text-left"
-            >
-              <span className="text-sm font-semibold text-slate-800">{topic}</span>
-              <span className="text-xs text-slate-500">{expanded ? "Hide" : "Open"}</span>
-            </button>
-            <AnimatePresence initial={false}>
-              {expanded ? (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden border-t border-white/50 px-3 py-3"
-                >
-                  <div className="space-y-3">
-                    {questions.map((question) => {
-                      const state = vivaEntry?.questions[question.id];
-                      return (
-                        <div key={question.id} className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium text-slate-800">{question.question}</p>
-                            <span className="text-[11px] font-semibold text-slate-500">
-                              {question.difficulty}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-slate-600">{question.expectedTalkingPoints}</p>
+      {submission.aiViva.length > 0 ? (
+        <div className="space-y-2">
+          {submission.aiViva.map((q, i) => {
+            const qId = `${activeId}-v${i + 1}`;
+            const state = vivaEntry?.questions[qId];
+            return (
+              <div key={qId} className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-slate-800">{i + 1}. {q}</p>
+                </div>
+                <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(state?.asked)}
+                    onChange={() => toggleQuestionAsked(activeId, qId)}
+                  />
+                  Asked
+                </label>
+                <textarea
+                  value={state?.notes ?? ""}
+                  onChange={(event) => setQuestionNotes(activeId, qId, event.target.value)}
+                  placeholder="Notes for this question"
+                  className={`mt-2 h-16 w-full resize-none rounded-lg border border-white/65 bg-white/70 px-2.5 py-2 text-xs text-slate-700 outline-none ${INPUT_GLOW_CLASS}`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : groupedViva.length > 0 ? (
+        groupedViva.map(([topic, questions]) => {
+          const expanded = expandedTopic === topic;
+          return (
+            <div key={topic} className="overflow-hidden rounded-xl border border-white/60 bg-white/45">
+              <button
+                type="button"
+                onClick={() => setExpandedTopic((current) => (current === topic ? null : topic))}
+                className="flex w-full items-center justify-between px-3 py-2 text-left"
+              >
+                <span className="text-sm font-semibold text-slate-800">{topic}</span>
+                <span className="text-xs text-slate-500">{expanded ? "Hide" : "Open"}</span>
+              </button>
+              <AnimatePresence initial={false}>
+                {expanded ? (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden border-t border-white/50 px-3 py-3"
+                  >
+                    <div className="space-y-3">
+                      {questions.map((question) => {
+                        const state = vivaEntry?.questions[question.id];
+                        return (
+                          <div key={question.id} className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-slate-800">{question.question}</p>
+                              <span className="text-[11px] font-semibold text-slate-500">
+                                {question.difficulty}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-600">{question.expectedTalkingPoints}</p>
 
-                          <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(state?.asked)}
-                              onChange={() => toggleQuestionAsked(activeId, question.id)}
+                            <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(state?.asked)}
+                                onChange={() => toggleQuestionAsked(activeId, question.id)}
+                              />
+                              Asked
+                            </label>
+
+                            <textarea
+                              value={state?.notes ?? ""}
+                              onChange={(event) =>
+                                setQuestionNotes(activeId, question.id, event.target.value)
+                              }
+                              placeholder="Notes for this question"
+                              className={`mt-2 h-16 w-full resize-none rounded-lg border border-white/65 bg-white/70 px-2.5 py-2 text-xs text-slate-700 outline-none ${INPUT_GLOW_CLASS}`}
                             />
-                            Asked
-                          </label>
-
-                          <textarea
-                            value={state?.notes ?? ""}
-                            onChange={(event) =>
-                              setQuestionNotes(activeId, question.id, event.target.value)
-                            }
-                            placeholder="Notes for this question"
-                            className={`mt-2 h-16 w-full resize-none rounded-lg border border-white/65 bg-white/70 px-2.5 py-2 text-xs text-slate-700 outline-none ${INPUT_GLOW_CLASS}`}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
-        );
-      })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          );
+        })
+      ) : (
+        <div className="rounded-xl border border-white/60 bg-white/45 px-4 py-5 text-center text-sm text-slate-600">
+          No viva questions available. Run AI review first.
+        </div>
+      )}
     </div>
   );
 

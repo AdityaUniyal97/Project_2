@@ -31,16 +31,36 @@ export interface Submission {
   submittedAt: string;
   status: TeacherSubmissionStatus;
   riskLevel: TeacherRiskLevel;
-  originalityPercent: number;
-  plagiarismPercent: number;
-  structuralOverlapPercent: number;
-  aiConfidencePercent: number;
-  commitRiskScore: number;
   projectType: ProjectType;
   liveDemoUrl?: string;
   githubUrl?: string;
+  /** 0-100 authenticity score from AI engine */
+  aiScore: number;
+  /** AI summary / primary finding */
+  aiSummary: string;
+  /** Flags from AI engine */
+  aiFlags: string[];
+  /** CLEAR | LOW | MONITOR | SUSPICIOUS | HIGH | CRITICAL */
+  aiRiskLevel: string;
+  /** CLEAR_TO_PASS | REQUIRE_VIVA | REQUIRE_LIVE_CODING | RECOMMEND_REJECTION */
+  aiRecommendation: string;
+  /** 0-100 confidence from AI engine */
+  aiConfidence: number;
+  /** Viva questions from AI engine */
+  aiViva: string[];
+  /** Live coding challenge from AI engine */
+  aiChallenge: Record<string, unknown> | null;
+  /** Full evidence breakdown */
+  aiEvidence: Record<string, unknown> | null;
+
+  /* Derived convenience fields (computed from real data) */
+  originalityPercent: number;
+  plagiarismPercent: number;
+  similarityScore: number;
+  commitRiskScore: number;
+  aiDetectionProbability: number;
+  codeQualityScore: number;
   summaryNarrative: string;
-  detectedSources: DetectedSource[];
   vivaQuestions: VivaQuestion[];
 }
 

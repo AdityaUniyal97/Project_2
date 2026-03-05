@@ -29,6 +29,12 @@ export interface SubmissionSchemaType {
   aiScore?: number | null;
   aiSummary?: string | null;
   aiFlags: string[];
+  aiRiskLevel?: string | null;
+  aiRecommendation?: string | null;
+  aiConfidence?: number | null;
+  aiViva?: string[];
+  aiChallenge?: Record<string, unknown> | null;
+  aiEvidence?: Record<string, unknown> | null;
   reviewStartedAt?: Date | null;
   reviewCompletedAt?: Date | null;
   assignedTeacherId?: Types.ObjectId;
@@ -56,6 +62,12 @@ export interface SafeSubmission {
   aiScore?: number | null;
   aiSummary?: string | null;
   aiFlags: string[];
+  aiRiskLevel?: string | null;
+  aiRecommendation?: string | null;
+  aiConfidence?: number | null;
+  aiViva?: string[];
+  aiChallenge?: Record<string, unknown> | null;
+  aiEvidence?: Record<string, unknown> | null;
   reviewStartedAt?: string | null;
   reviewCompletedAt?: string | null;
   assignedTeacherId?: string | null;
@@ -129,6 +141,30 @@ const submissionSchema = new Schema<SubmissionSchemaType>(
       type: [String],
       default: [],
     },
+    aiRiskLevel: {
+      type: String,
+      default: null,
+    },
+    aiRecommendation: {
+      type: String,
+      default: null,
+    },
+    aiConfidence: {
+      type: Number,
+      default: null,
+    },
+    aiViva: {
+      type: [String],
+      default: [],
+    },
+    aiChallenge: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    aiEvidence: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
     reviewStartedAt: {
       type: Date,
       default: null,
@@ -176,7 +212,7 @@ export const Submission =
 export function toSafeSubmission(
   submission: Pick<
     SubmissionDocument,
-    "_id" | "ownerId" | "title" | "description" | "repoUrl" | "branch" | "techTags" | "rollNumber" | "liveDemoUrl" | "status" | "aiScore" | "aiSummary" | "aiFlags" | "reviewStartedAt" | "reviewCompletedAt" | "assignedTeacherId" | "teacherReview" | "createdAt" | "updatedAt"
+    "_id" | "ownerId" | "title" | "description" | "repoUrl" | "branch" | "techTags" | "rollNumber" | "liveDemoUrl" | "status" | "aiScore" | "aiSummary" | "aiFlags" | "aiRiskLevel" | "aiRecommendation" | "aiConfidence" | "aiViva" | "aiChallenge" | "aiEvidence" | "reviewStartedAt" | "reviewCompletedAt" | "assignedTeacherId" | "teacherReview" | "createdAt" | "updatedAt"
   >,
 ): SafeSubmission {
   return {
@@ -193,6 +229,12 @@ export function toSafeSubmission(
     aiScore: submission.aiScore ?? null,
     aiSummary: submission.aiSummary ?? null,
     aiFlags: submission.aiFlags ?? [],
+    aiRiskLevel: submission.aiRiskLevel ?? null,
+    aiRecommendation: submission.aiRecommendation ?? null,
+    aiConfidence: submission.aiConfidence ?? null,
+    aiViva: submission.aiViva ?? [],
+    aiChallenge: submission.aiChallenge ?? null,
+    aiEvidence: submission.aiEvidence ?? null,
     reviewStartedAt: submission.reviewStartedAt ? submission.reviewStartedAt.toISOString() : null,
     reviewCompletedAt: submission.reviewCompletedAt ? submission.reviewCompletedAt.toISOString() : null,
     assignedTeacherId: submission.assignedTeacherId ? String(submission.assignedTeacherId) : null,
