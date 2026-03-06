@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import DemoGlassCard from "../../components/demo/DemoGlassCard";
 import PipelineStep from "../../components/student/review/PipelineStep";
-import LiveCodingChallenge from "../../components/student/review/LiveCodingChallenge";
 import {
   deleteSubmission,
   getReviewStatus,
@@ -82,6 +82,8 @@ function getPipelineStepStatus(
   const currentRank = rankMap[status];
   const stepRank = stepRankMap[stepId];
 
+  // When submission is fully completed, all steps are done
+  if (status === "completed") return "completed" as const;
   if (status === "failed" && stepId === "completed") return "pending" as const;
   if (stepRank < currentRank) return "completed" as const;
   if (stepRank === currentRank) return "active" as const;
@@ -94,9 +96,13 @@ function toReadableDate(isoDate: string) {
   return parsed.toLocaleString();
 }
 
+const REVIEW_SELECTED_KEY = "pg_review_selected";
+
 export default function StudentReviewPage() {
   const [submissions, setSubmissions] = useState<MySubmissionRecord[]>([]);
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(
+    () => sessionStorage.getItem(REVIEW_SELECTED_KEY),
+  );
   const [statusById, setStatusById] = useState<Record<string, ReviewStatusData>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isStartingReview, setIsStartingReview] = useState(false);
@@ -180,6 +186,15 @@ export default function StudentReviewPage() {
     void loadSubmissions();
   }, [loadSubmissions]);
 
+  // Persist selected submission so it survives tab switching
+  useEffect(() => {
+    if (selectedSubmissionId) {
+      sessionStorage.setItem(REVIEW_SELECTED_KEY, selectedSubmissionId);
+    } else {
+      sessionStorage.removeItem(REVIEW_SELECTED_KEY);
+    }
+  }, [selectedSubmissionId]);
+
   useEffect(() => {
     if (!selectedSubmissionId) return;
     void refreshReviewStatus(selectedSubmissionId);
@@ -244,6 +259,7 @@ export default function StudentReviewPage() {
   };
 
   const handleDelete = async (submissionId: string) => {
+    if (!window.confirm("Are you sure you want to delete this submission? This cannot be undone.")) return;
     setError("");
     try {
       await deleteSubmission(submissionId);
@@ -268,12 +284,155 @@ export default function StudentReviewPage() {
 
   return (
     <motion.main
-      className="mx-auto w-full max-w-6xl px-4 pb-10 sm:px-8"
+      className="w-full space-y-6"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28 }}
     >
-      <DemoGlassCard className={`p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
+      {/* ── Top Row: Analysis Results (wide) + Submission Details (narrow) ── */}
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
+        {/* Analysis Results — spans 2 of 3 cols */}
+        <DemoGlassCard className={`p-6 xl:col-span-2 ${GLASS_INTERACTIVE_CLASS}`}>
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-900">Analysis Results</h3>
+            {selectedStatus === "completed" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/80 px-3 py-1 text-xs font-semibold text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Analysis Complete
+              </span>
+            )}
+          </div>
+
+          {/* Pipeline steps row */}
+          <div className="mt-6 grid gap-2.5 grid-cols-2 sm:grid-cols-4">
+            {PIPELINE_STEPS.map((step, index) => (
+              <PipelineStep
+                key={`inline-pipeline-${step.id}`}
+                index={index}
+                label={step.label}
+                status={
+                  selectedStatus ? getPipelineStepStatus(step.id, selectedStatus) : "pending"
+                }
+              />
+            ))}
+          </div>
+
+          {/* Progress bar (processing only) */}
+          <AnimatePresence>
+            {isProcessing && (
+              <motion.div
+                key="inline-processing-visual"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-6"
+              >
+                <ProcessingProgressBar
+                  status={selectedStatus!}
+                  reviewStartedAt={selectedReviewData?.reviewStartedAt ?? null}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* AI Results — scrollable content area */}
+          <div className="mt-6">
+            <AnimatePresence mode="wait">
+              {showCompletedResults && selectedReviewData ? (
+                <motion.div
+                  key="results"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35 }}
+                  className="max-h-[50vh] overflow-y-auto rounded-2xl pr-1"
+                >
+                  <AiResultsPanel data={selectedReviewData} />
+                </motion.div>
+              ) : selectedStatus === "failed" ? (
+                <motion.div
+                  key="failed"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="rounded-2xl border border-rose-200/80 bg-rose-50/60 p-6"
+                >
+                  <p className="text-sm font-semibold text-rose-700">Analysis Failed</p>
+                  <p className="mt-1 text-sm text-rose-600">
+                    {selectedReviewData?.aiSummary || "The AI engine encountered an error. Please try again."}
+                  </p>
+                </motion.div>
+              ) : !isProcessing ? (
+                <motion.div
+                  key="waiting"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="rounded-2xl border border-white/60 bg-white/40 p-6"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    AI Result
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Click &ldquo;Start AI Review&rdquo; to begin plagiarism and authenticity analysis.
+                  </p>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </DemoGlassCard>
+
+        {/* Submission Details — spans 1 of 3 cols */}
+        <DemoGlassCard className={`p-6 xl:col-span-1 xl:sticky xl:top-6 ${GLASS_INTERACTIVE_CLASS}`}>
+          <h3 className="text-base font-semibold text-slate-900">Submission Details</h3>
+
+          {selectedSubmission ? (
+            <div className="mt-6 space-y-3">
+              <div className="rounded-xl border border-white/60 bg-white/40 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Project Title
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-800">{selectedSubmission.title}</p>
+              </div>
+              <div className="rounded-xl border border-white/60 bg-white/40 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Repository
+                </p>
+                <a
+                  href={selectedSubmission.repoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 block truncate text-sm font-medium text-blue-700 hover:text-blue-800"
+                >
+                  {selectedSubmission.repoUrl}
+                </a>
+              </div>
+              <div className="rounded-xl border border-white/60 bg-white/40 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Current Status
+                </p>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${toStatusBadgeClass(selectedStatus ?? "submitted")}`}>
+                    {selectedStatus ? toStatusLabel(selectedStatus) : "Unknown"}
+                  </span>
+                </div>
+              </div>
+              {canStartReview && (
+                <button
+                  type="button"
+                  disabled={isStartingReview}
+                  onClick={() => void handleStartReview(selectedSubmission.id)}
+                  className={`w-full rounded-xl border border-blue-200/80 bg-gradient-to-r from-blue-500/90 to-cyan-500/90 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)] transition hover:shadow-[0_12px_26px_rgba(37,99,235,0.30)] disabled:cursor-not-allowed disabled:opacity-60 ${BUTTON_INTERACTIVE_CLASS}`}
+                >
+                  {isStartingReview ? "Starting..." : selectedStatus === "completed" || selectedStatus === "failed" ? "🔄 Re-Run Analysis" : "🚀 Start AI Review"}
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="mt-6 text-sm text-slate-600">Select a submission to view review details.</p>
+          )}
+        </DemoGlassCard>
+      </div>
+
+      {/* ── Bottom: AI Review Queue (full width) ── */}
+      <DemoGlassCard className={`p-6 ${GLASS_INTERACTIVE_CLASS}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">AI Review Queue</h2>
@@ -293,11 +452,16 @@ export default function StudentReviewPage() {
         {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
 
         {isLoading ? (
-          <p className="mt-4 text-sm text-slate-600">Loading submissions...</p>
+          <p className="mt-6 text-sm text-slate-600">Loading submissions...</p>
         ) : submissions.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-600">No submissions found. Submit a project first.</p>
+          <p className="mt-6 text-sm text-slate-600">
+            No submissions found.{" "}
+            <Link to="/student/submit" className="font-semibold text-blue-600 hover:underline">
+              Submit your first project &rarr;
+            </Link>
+          </p>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {submissions.map((submission) => {
               const status = statusById[submission.id]?.status ?? normalizeStatus(submission.status);
               const isSelected = submission.id === selectedSubmissionId;
@@ -307,16 +471,16 @@ export default function StudentReviewPage() {
                   key={submission.id}
                   type="button"
                   onClick={() => setSelectedSubmissionId(submission.id)}
-                  className={`rounded-2xl border px-4 py-3 text-left transition ${
+                  className={`flex h-full flex-col rounded-2xl border px-4 py-3 text-left transition ${
                     isSelected
                       ? "border-blue-200/80 bg-blue-50/70"
                       : "border-white/65 bg-white/45 hover:bg-white/65"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{submission.title}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900">{submission.title}</p>
                     <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${toStatusBadgeClass(
+                      className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${toStatusBadgeClass(
                         status,
                       )}`}
                     >
@@ -325,7 +489,7 @@ export default function StudentReviewPage() {
                   </div>
                   <p className="mt-1 text-xs text-slate-600">{toReadableDate(submission.createdAt)}</p>
                   <p className="mt-1 truncate text-xs font-medium text-blue-700">{submission.repoUrl}</p>
-                  <div className="mt-3 flex items-center justify-end gap-2">
+                  <div className="mt-auto flex items-center justify-end gap-2 pt-3">
                     <button
                       type="button"
                       onClick={(event) => {
@@ -358,138 +522,6 @@ export default function StudentReviewPage() {
           </div>
         )}
       </DemoGlassCard>
-
-      <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.3fr)]">
-        <DemoGlassCard className={`h-fit p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-slate-900">Submission Review</h3>
-            <button
-              type="button"
-              disabled={!selectedSubmission || !canStartReview || isStartingReview}
-              onClick={() => {
-                if (!selectedSubmission) return;
-                void handleStartReview(selectedSubmission.id);
-              }}
-              className={`rounded-lg border border-blue-200/80 bg-gradient-to-r from-blue-500/90 to-cyan-500/90 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_14px_26px_rgba(37,99,235,0.24)] transition hover:shadow-[0_18px_30px_rgba(37,99,235,0.28)] disabled:cursor-not-allowed disabled:opacity-60 ${BUTTON_INTERACTIVE_CLASS}`}
-            >
-              {isStartingReview ? "Starting..." : canStartReview && selectedStatus !== "submitted" ? "Re-Review" : "Start AI Review"}
-            </button>
-          </div>
-
-          {selectedSubmission ? (
-            <div className="mt-4 space-y-3">
-              <div className="rounded-xl border border-white/60 bg-white/40 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  Project Title
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-800">{selectedSubmission.title}</p>
-              </div>
-              <div className="rounded-xl border border-white/60 bg-white/40 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  Repository
-                </p>
-                <a
-                  href={selectedSubmission.repoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 block truncate text-sm font-medium text-blue-700 hover:text-blue-800"
-                >
-                  {selectedSubmission.repoUrl}
-                </a>
-              </div>
-              <div className="rounded-xl border border-white/60 bg-white/40 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  Current Status
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-800">
-                  {selectedStatus ? toStatusLabel(selectedStatus) : "Unknown"}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-slate-600">Select a submission to view review details.</p>
-          )}
-        </DemoGlassCard>
-
-        <DemoGlassCard className={`p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
-          <h3 className="text-base font-semibold text-slate-900">Review Pipeline</h3>
-          <p className="mt-1 text-sm text-slate-600">
-            submitted &rarr; queued &rarr; processing &rarr; completed
-          </p>
-
-          <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-            {PIPELINE_STEPS.map((step, index) => (
-              <PipelineStep
-                key={step.id}
-                index={index}
-                label={step.label}
-                status={
-                  selectedStatus ? getPipelineStepStatus(step.id, selectedStatus) : "pending"
-                }
-              />
-            ))}
-          </div>
-
-          {/* Live Progress Bar during processing */}
-          <AnimatePresence>
-            {isProcessing && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-5"
-              >
-                <ProcessingProgressBar
-                  status={selectedStatus!}
-                  reviewStartedAt={selectedReviewData?.reviewStartedAt ?? null}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* AI Results */}
-          <div className="mt-5 max-h-[520px] overflow-y-auto rounded-2xl">
-            <AnimatePresence mode="wait">
-              {showCompletedResults && selectedReviewData ? (
-                <motion.div
-                  key="results"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35 }}
-                >
-                  <AiResultsPanel data={selectedReviewData} />
-                </motion.div>
-              ) : selectedStatus === "failed" ? (
-                <motion.div
-                  key="failed"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="rounded-2xl border border-rose-200/80 bg-rose-50/60 p-4"
-                >
-                  <p className="text-sm font-semibold text-rose-700">Analysis Failed</p>
-                  <p className="mt-1 text-sm text-rose-600">
-                    {selectedReviewData?.aiSummary || "The AI engine encountered an error. Please try again."}
-                  </p>
-                </motion.div>
-              ) : !isProcessing ? (
-                <motion.div
-                  key="waiting"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="rounded-2xl border border-white/60 bg-white/40 p-4"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    AI Result
-                  </p>
-                  <p className="mt-2 text-sm text-slate-600">
-                    Click "Start AI Review" to begin plagiarism and authenticity analysis.
-                  </p>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
-        </DemoGlassCard>
-      </section>
     </motion.main>
   );
 }
@@ -542,17 +574,31 @@ function ProcessingProgressBar({
   // Smooth progress within current stage
   const stageProgress = Math.min((elapsed % 12) / 12, 0.95);
   const nextPct = stageIndex < ANALYSIS_STAGES.length - 1 ? ANALYSIS_STAGES[stageIndex + 1].pct : 100;
-  const progressPct = Math.min(
+  const simulatedPct = Math.min(
     currentStage.pct + (nextPct - currentStage.pct) * stageProgress,
     99,
   );
+  const progressPct =
+    status === "completed"
+      ? 100
+      : status === "processing"
+        ? Math.max(simulatedPct, 54)
+        : status === "queued"
+          ? Math.max(Math.min(simulatedPct, 55), 22)
+          : status === "submitted"
+            ? 18
+            : status === "failed"
+              ? 72
+              : 8;
+  const stepStates = PIPELINE_STEPS.map((step) => getPipelineStepStatus(step.id, status));
+  const activeStepIndex = Math.max(stepStates.findIndex((stepStatus) => stepStatus === "active"), 0);
 
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
   const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
   return (
-    <div className="rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-50/80 via-cyan-50/40 to-white/60 p-5">
+    <div className="rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-50/80 via-cyan-50/40 to-white/60 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3">
@@ -560,61 +606,131 @@ function ProcessingProgressBar({
             <span className="relative inline-flex h-3 w-3 rounded-full bg-blue-500" />
           </span>
           <p className="text-sm font-semibold text-blue-800">
-            {status === "queued" ? "Waiting in Queue..." : "Analyzing Project"}
+            {status === "queued" ? "Waiting in Queue..." : "AI Scan in Progress"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full border border-blue-200/80 bg-white/70 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-blue-700">
-            {timeStr}
-          </span>
-        </div>
+        <span className="rounded-full border border-blue-200/80 bg-white/70 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-blue-700">
+          {timeStr}
+        </span>
       </div>
 
-      {/* 3D Progress Bar */}
-      <div className="mt-4">
-        <div className="relative h-5 w-full overflow-hidden rounded-full bg-slate-200/60 shadow-inner">
-          {/* Background shimmer */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
-          {/* Progress fill */}
+      <div className="mt-4 overflow-hidden rounded-2xl border border-white/55 bg-white/45">
+        <div className="pointer-events-none relative h-32">
+          <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(to_right,rgba(148,163,184,0.22)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.16)_1px,transparent_1px)] [background-size:18px_18px]" />
           <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 shadow-[0_2px_8px_rgba(59,130,246,0.5),inset_0_1px_0_rgba(255,255,255,0.3)]"
+            className="absolute inset-y-0 w-14 bg-gradient-to-r from-transparent via-cyan-300/35 to-transparent"
+            animate={{ x: ["-20%", "115%"] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: "linear" }}
+          />
+
+          <div className="absolute left-[10%] right-[10%] top-[40%] h-0.5 rounded-full bg-blue-200/70" />
+          <motion.div
+            className="absolute left-[10%] top-[40%] h-0.5 rounded-full bg-gradient-to-r from-blue-400/65 via-cyan-400/90 to-emerald-400/70"
             initial={{ width: "0%" }}
-            animate={{ width: `${progressPct}%` }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
-            {/* Shine effect on the bar */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/25 to-transparent" style={{ height: "50%" }} />
-          </motion.div>
-          {/* Percentage overlay */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-[11px] font-bold text-slate-700 drop-shadow-sm">
-              {Math.round(progressPct)}%
-            </span>
+            animate={{ width: `${progressPct * 0.8}%` }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
+          />
+
+          {[0, 1, 2].map((particle) => (
+            <motion.span
+              key={`flow-dot-${particle}`}
+              className="absolute top-[38%] h-1.5 w-1.5 rounded-full bg-cyan-300/85 shadow-[0_0_10px_rgba(56,189,248,0.65)]"
+              animate={{ x: ["10%", `${8 + progressPct * 0.8}%`], opacity: [0, 1, 0] }}
+              transition={{
+                duration: 1.7,
+                delay: particle * 0.45,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+            />
+          ))}
+
+          <div className="absolute left-[10%] right-[10%] top-[40%] flex -translate-y-1/2 justify-between">
+            {PIPELINE_STEPS.map((step, index) => {
+              const stepStatus = stepStates[index];
+              const isActiveStep = stepStatus === "active";
+              const isCompletedStep = stepStatus === "completed";
+
+              return (
+                <div key={step.id} className="relative">
+                  <span
+                    className={`inline-flex h-3.5 w-3.5 rounded-full border ${
+                      isCompletedStep
+                        ? "border-emerald-300/90 bg-emerald-300/85"
+                        : isActiveStep
+                          ? "border-cyan-300/90 bg-cyan-300/90"
+                          : "border-slate-300/80 bg-white/80"
+                    }`}
+                  />
+                  {isActiveStep ? (
+                    <motion.span
+                      className="pointer-events-none absolute inset-[-6px] rounded-full border border-cyan-300/75"
+                      animate={{ scale: [0.9, 1.25, 0.9], opacity: [0.25, 0.75, 0.25] }}
+                      transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="absolute bottom-3 left-[10%] right-[10%] grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {PIPELINE_STEPS.map((step, index) => {
+              const stepStatus = stepStates[index];
+              const isActiveStep = stepStatus === "active";
+              const isCompletedStep = stepStatus === "completed";
+
+              return (
+                <div key={`scan-step-${step.id}`} className="rounded-lg border border-white/55 bg-white/55 px-2.5 py-1.5">
+                  <p className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                    {step.label}
+                  </p>
+                  <p
+                    className={`mt-0.5 text-[10px] font-semibold ${
+                      isCompletedStep
+                        ? "text-emerald-700"
+                        : isActiveStep
+                          ? "text-blue-700"
+                          : "text-slate-500"
+                    }`}
+                  >
+                    {isCompletedStep ? "Completed" : isActiveStep ? "Running" : "Pending"}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="absolute right-3 top-3 rounded-full border border-blue-200/80 bg-white/70 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
+            {Math.round(progressPct)}%
           </div>
         </div>
       </div>
 
-      {/* Current stage */}
-      <div className="mt-3 flex items-center gap-2">
-        <span className="text-base">{currentStage.icon}</span>
+      <div className="mt-3 flex items-center justify-between gap-2">
         <p className="text-xs font-medium text-blue-700">{currentStage.label}</p>
+        <span className="text-[11px] font-semibold text-slate-500">Stage {stageIndex + 1} of {ANALYSIS_STAGES.length}</span>
       </div>
 
-      {/* Stage dots */}
-      <div className="mt-3 flex items-center gap-1">
-        {ANALYSIS_STAGES.map((stage, i) => (
-          <div
-            key={stage.label}
-            className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-              i < stageIndex
-                ? "bg-emerald-400"
-                : i === stageIndex
-                  ? "bg-blue-400 animate-pulse"
-                  : "bg-slate-200"
-            }`}
-            title={stage.label}
-          />
-        ))}
+      <div className="mt-2">
+        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600">
+          <span>Finalizing Report</span>
+          <span>{Math.round(progressPct)}%</span>
+        </div>
+        <div className="mt-1.5 relative h-2.5 overflow-hidden rounded-full border border-white/60 bg-slate-200/65">
+          <motion.div
+            className="relative h-full rounded-full bg-gradient-to-r from-blue-500/90 via-cyan-400/90 to-emerald-400/80"
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPct}%` }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <motion.span
+              className="pointer-events-none absolute inset-y-0 w-12 bg-gradient-to-r from-transparent via-white/45 to-transparent"
+              animate={{ x: ["-40%", "180%"] }}
+              transition={{ duration: 1.3, repeat: Infinity, ease: "linear" }}
+            />
+          </motion.div>
+        </div>
       </div>
     </div>
   );
@@ -643,6 +759,7 @@ function recommendationLabel(rec: string | null) {
 }
 
 function AiResultsPanel({ data }: { data: ReviewStatusData }) {
+  const navigate = useNavigate();
   const colors = riskLevelColor(data.aiRiskLevel);
   const score = data.aiScore ?? 0;
   const confidence = data.aiConfidence ?? 0;
@@ -655,14 +772,14 @@ function AiResultsPanel({ data }: { data: ReviewStatusData }) {
   const aiDetection = typeof evidence?.ai_detection_probability === "number" ? evidence.ai_detection_probability : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header: Score Circle + Risk Level */}
-      <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-white/70 via-white/50 to-slate-50/40 p-5">
+      <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-white/70 via-white/50 to-slate-50/40 p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
           Analysis Results
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-6">
+        <div className="mt-4 grid gap-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
           {/* Authenticity Score Ring */}
           <div className="relative flex-shrink-0">
             <svg width="110" height="110" viewBox="0 0 110 110">
@@ -693,7 +810,7 @@ function AiResultsPanel({ data }: { data: ReviewStatusData }) {
           </div>
 
           {/* Risk + Recommendation */}
-          <div className="flex-1 space-y-2.5">
+          <div className="space-y-2.5">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Risk Level</p>
               <span className={`mt-1 inline-block rounded-full border ${colors.border} ${colors.badgeBg} px-3 py-1 text-sm font-bold ${colors.text}`}>
@@ -725,7 +842,7 @@ function AiResultsPanel({ data }: { data: ReviewStatusData }) {
       </div>
 
       {/* Sub-Scores Grid */}
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
         <ScoreCard
           label="Plagiarism"
           value={similarityScore != null ? `${Math.round(similarityScore * 100)}%` : "--"}
@@ -758,7 +875,7 @@ function AiResultsPanel({ data }: { data: ReviewStatusData }) {
 
       {/* AI Summary */}
       {data.aiSummary?.trim() && (
-        <div className="rounded-2xl border border-white/60 bg-white/50 p-4">
+        <div className="rounded-2xl border border-white/60 bg-white/50 p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             AI Summary
           </p>
@@ -768,7 +885,7 @@ function AiResultsPanel({ data }: { data: ReviewStatusData }) {
 
       {/* Flags */}
       {data.aiFlags.length > 0 && (
-        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/40 p-4">
+        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/40 p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700">
             Flags Identified ({data.aiFlags.length})
           </p>
@@ -787,7 +904,7 @@ function AiResultsPanel({ data }: { data: ReviewStatusData }) {
 
       {/* Viva Questions */}
       {data.aiViva.length > 0 && (
-        <div className="rounded-2xl border border-blue-200/60 bg-blue-50/40 p-4">
+        <div className="rounded-2xl border border-blue-200/60 bg-blue-50/40 p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
             Suggested Viva Questions ({data.aiViva.length})
           </p>
@@ -802,9 +919,35 @@ function AiResultsPanel({ data }: { data: ReviewStatusData }) {
         </div>
       )}
 
-      {/* Live Coding Challenge */}
+      {/* Next Phase: Live Coding Challenge */}
       {data.aiChallenge && Object.keys(data.aiChallenge).length > 0 && (
-        <LiveCodingChallenge challenge={data.aiChallenge as Record<string, unknown>} />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-violet-200/60 bg-gradient-to-br from-violet-50/80 via-purple-50/40 to-indigo-50/60 p-6"
+        >
+          <div className="flex flex-col items-start gap-3 text-left sm:items-center sm:text-center lg:flex-row lg:items-center lg:justify-between lg:text-left">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 shadow-[0_8px_20px_rgba(139,92,246,0.3)]">
+              <span className="text-xl text-white">💻</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-violet-900">Phase 2: Live Coding Challenge</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                Prove your authorship by modifying code from <span className="font-semibold text-violet-700">your own project</span>.
+                {typeof (data.aiChallenge as Record<string, unknown>).filename === "string" && (
+                  <> Based on <code className="rounded bg-violet-100/80 px-1 py-0.5 font-mono text-[11px] text-violet-800">{(data.aiChallenge as Record<string, unknown>).filename as string}</code></>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/student/live-coding", { state: { challenge: data.aiChallenge } })}
+              className={`mt-1 shrink-0 rounded-xl border border-violet-300/80 bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(139,92,246,0.35)] transition-all hover:shadow-[0_12px_32px_rgba(139,92,246,0.45)] hover:scale-[1.02] active:scale-[0.98] ${BUTTON_INTERACTIVE_CLASS}`}
+            >
+              Start Live Coding →
+            </button>
+          </div>
+        </motion.div>
       )}
     </div>
   );

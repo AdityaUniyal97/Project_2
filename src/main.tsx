@@ -17,7 +17,7 @@ import TeacherVivaPage from "./pages/teacher/TeacherVivaPage";
 import TeacherDemoViewerPage from "./pages/teacher/TeacherDemoViewerPage";
 import StudentOverviewPage from "./pages/student/StudentOverviewPage";
 import StudentReviewPage from "./pages/student/StudentReviewPage";
-import StudentChallengePage from "./pages/student/StudentChallengePage";
+import StudentLiveCodingPage from "./pages/student/StudentLiveCodingPage";
 import AccountPage from "./pages/AccountPage";
 import { getDashboardPathForRole } from "./lib/authClient";
 import "./index.css";
@@ -109,8 +109,10 @@ createRoot(document.getElementById("root")!).render(
             <Route path="ai-review" element={<StudentReviewPage />} />
             <Route path="review" element={<Navigate to="/student/ai-review" replace />} />
             <Route path="analysis" element={<Navigate to="/student/ai-review" replace />} />
-            <Route path="challenge" element={<StudentChallengePage />} />
+            <Route path="challenge" element={<Navigate to="/student/live-coding" replace />} />
+            <Route path="live-coding" element={<StudentLiveCodingPage />} />
             <Route path="account" element={<AccountPage />} />
+            <Route path="*" element={<Navigate to="/student/overview" replace />} />
           </Route>
 
           <Route

@@ -23,7 +23,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="w-full space-y-6">
       <DemoGlassCard className={`p-6 ${GLASS_INTERACTIVE_CLASS}`}>
         <h2 className="text-lg font-semibold text-slate-900">Account Details</h2>
         <div className="mt-4 space-y-3">

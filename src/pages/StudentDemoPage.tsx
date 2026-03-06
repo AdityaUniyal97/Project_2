@@ -184,13 +184,13 @@ export default function StudentDemoPage() {
   const liveDemoRef = useRef<HTMLInputElement | null>(null);
 
   const validation = useMemo(() => getValidationState(formState), [formState]);
-  const isFormValid =
+  const hasRequiredFieldsOk =
     !validation.projectTitleError &&
     !validation.branchError &&
     !validation.rollNumberError &&
-    !validation.githubError &&
-    !validation.liveDemoError;
-  const isSubmitDisabled = isSubmitting || !isFormValid;
+    !validation.githubError;
+  const isFormValid = hasRequiredFieldsOk && !validation.liveDemoError;
+  const isSubmitDisabled = isSubmitting || !hasRequiredFieldsOk;
 
   const showProjectTitleError =
     (touched.projectTitle || didAttemptSubmit) && validation.projectTitleError;
@@ -198,7 +198,8 @@ export default function StudentDemoPage() {
   const showRollNumberError =
     (touched.rollNumber || didAttemptSubmit) && validation.rollNumberError;
   const showGithubError = (touched.githubLink || didAttemptSubmit) && validation.githubError;
-  const showLiveDemoError = formState.liveDemoUrl.trim() && validation.liveDemoError;
+  const showLiveDemoError =
+    (touched.liveDemoUrl || didAttemptSubmit) && validation.liveDemoError;
   const showGithubValid = formState.githubLink.trim() && !validation.githubError;
 
   const projectLooksGood = formState.projectTitle.trim().length >= 3;
@@ -223,12 +224,7 @@ export default function StudentDemoPage() {
     validation.liveDemoError,
   ]);
 
-  const hasRequiredFieldsValid =
-    !validation.projectTitleError &&
-    !validation.branchError &&
-    !validation.rollNumberError &&
-    !validation.githubError;
-  const previewStatusLabel = hasRequiredFieldsValid ? "Ready to submit" : "Missing required fields";
+  const previewStatusLabel = hasRequiredFieldsOk ? "Ready to submit" : "Missing required fields";
   const recentSubmissions = useMemo(() => submissions.slice(0, 5), [submissions]);
 
   const loadSubmissions = async () => {
@@ -401,6 +397,7 @@ export default function StudentDemoPage() {
 
   const onDeleteSubmission = async (id: string) => {
     if (isSubmitting) return;
+    if (!window.confirm("Are you sure you want to delete this submission? This cannot be undone.")) return;
 
     setSubmissionError("");
 
@@ -429,27 +426,31 @@ export default function StudentDemoPage() {
 
   return (
     <motion.main
-      className="mx-auto w-full max-w-5xl px-4 pb-10 sm:px-8"
+      className="w-full space-y-6"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28 }}
     >
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <DemoGlassCard className={`p-6 sm:p-8 ${GLASS_INTERACTIVE_CLASS}`}>
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
-              Student Project Submission
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Submit your project repository for tracking and future AI review.
-            </p>
-          </div>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <DemoGlassCard
+            className={`p-6 ${GLASS_INTERACTIVE_CLASS}`}
+          >
+            <div className="mb-6">
+              <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
+                Student Project Submission
+              </h1>
+              <p className="mt-2 text-sm text-slate-600">
+                Submit your project repository for tracking and future AI review.
+              </p>
+            </div>
 
-          <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
-            <SectionHint
-              title="Project Basics"
-              hint="Add project identity and technical details for accurate processing."
-            />
+            <div>
+              <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
+                <SectionHint
+                  title="Project Basics"
+                  hint="Add project identity and technical details for accurate processing."
+                />
 
             <label className="flex flex-col gap-1.5 sm:col-span-2">
               <div className="flex items-center justify-between gap-2">
@@ -626,218 +627,222 @@ export default function StudentDemoPage() {
               ) : null}
             </label>
 
-            {submissionError ? (
-              <p className="sm:col-span-2 text-sm font-medium text-rose-600">{submissionError}</p>
-            ) : null}
-
-            <div className="pt-1 sm:col-span-2 flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={isSubmitDisabled}
-                className={`inline-flex items-center gap-2 rounded-2xl border border-blue-200/80 bg-gradient-to-r from-blue-500/90 to-cyan-500/90 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_15px_28px_rgba(14,116,220,0.24)] transition ${
-                  isSubmitDisabled
-                    ? "cursor-not-allowed opacity-60"
-                    : "hover:translate-y-[-1px] hover:shadow-[0_18px_30px_rgba(14,116,220,0.27)]"
-                } ${BUTTON_INTERACTIVE_CLASS}`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.35)" strokeWidth="3" />
-                      <path d="M22 12a10 10 0 00-10-10" stroke="white" strokeWidth="3" strokeLinecap="round" />
-                    </svg>
-                    {editingSubmissionId ? "Updating..." : "Submitting..."}
-                  </>
-                ) : editingSubmissionId ? (
-                  "Update Submission"
-                ) : (
-                  "Submit Project"
-                )}
-              </button>
-
-              {editingSubmissionId ? (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className={`rounded-2xl border border-white/70 bg-white/60 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white/80 ${BUTTON_INTERACTIVE_CLASS}`}
-                >
-                  Cancel Edit
-                </button>
-              ) : null}
-            </div>
-          </form>
-
-          <AnimatePresence>
-            {showSuccessState ? (
-              <motion.div
-                className="mt-5 rounded-2xl border border-emerald-200/75 bg-emerald-50/70 px-4 py-4"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 6 }}
-                transition={{ duration: 0.22 }}
-              >
-                <h2 className="text-sm font-semibold text-emerald-800">
-                  Submission Saved
-                </h2>
-                <p className="mt-1 text-sm text-emerald-700">
-                  Your submission record has been saved successfully.
-                </p>
-                <div className="mt-3 grid gap-2 text-xs text-slate-700">
-                  <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-white/55 px-3 py-2">
-                    <span>Submission Saved</span>
-                    <StatusBadge label="Done" tone="good" />
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-blue-200/70 bg-white/55 px-3 py-2">
-                    <span>Status</span>
-                    <StatusBadge label="submitted" tone="warning" />
-                  </div>
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </DemoGlassCard>
-
-        <DemoGlassCard className={`h-fit p-4 ${GLASS_INTERACTIVE_CLASS}`}>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Preview Summary
-          </h2>
-          <p className="mt-1 text-xs text-slate-500">Live snapshot of your current draft.</p>
-
-          <div className="mt-3 overflow-hidden rounded-xl border border-white/60 bg-white/40">
-            <div
-              className="h-1.5 bg-gradient-to-r from-blue-500/90 to-cyan-500/90 transition-all"
-              style={{ width: `${completionScore}%` }}
-            />
-          </div>
-          <p className="mt-1 text-[11px] font-medium text-slate-500">Completeness: {completionScore}%</p>
-
-          <dl className="mt-4 space-y-3 text-xs">
-            <div>
-              <dt className="font-semibold text-slate-500">Title</dt>
-              <dd className="mt-1 text-slate-800">{formState.projectTitle || "Not set"}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">Branch</dt>
-              <dd className="mt-1 text-slate-800">{formState.branch || "Not selected"}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">Tech Tags</dt>
-              <dd className="mt-1 text-slate-800">{formState.techStack.length} selected</dd>
-              {formState.techStack.length ? (
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {formState.techStack.slice(0, 4).map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border border-white/65 bg-white/55 px-2 py-0.5 text-[10px] font-medium text-slate-600"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                  {formState.techStack.length > 4 ? (
-                    <span className="rounded-full border border-white/65 bg-white/55 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                      +{formState.techStack.length - 4} more
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">GitHub Link</dt>
-              <dd className="mt-1 text-slate-800">
-                {!formState.githubLink.trim()
-                  ? "Required"
-                  : showGithubValid
-                    ? "Valid"
-                    : "Needs correction"}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">Live Demo URL</dt>
-              <dd className="mt-1 text-slate-800">
-                {!formState.liveDemoUrl.trim()
-                  ? "Optional"
-                  : !validation.liveDemoError
-                    ? "Valid"
-                    : "Needs correction"}
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-500">Status</dt>
-              <dd className="mt-1">
-                <StatusBadge label={previewStatusLabel} tone={hasRequiredFieldsValid ? "good" : "warning"} />
-              </dd>
-            </div>
-          </dl>
-        </DemoGlassCard>
-      </div>
-
-      <DemoGlassCard className={`mt-5 p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-slate-900">Recent Submissions</h2>
-          <StatusBadge label={`${recentSubmissions.length} Showing`} tone="neutral" />
-        </div>
-
-        {submissionError ? <p className="mt-3 text-sm text-rose-600">{submissionError}</p> : null}
-
-        {isLoadingSubmissions ? (
-          <p className="mt-3 text-sm text-slate-600">Loading submissions...</p>
-        ) : recentSubmissions.length ? (
-          <div className="mt-3 grid gap-3">
-            {recentSubmissions.map((submission) => (
-              <div
-                key={submission.id}
-                className={`group rounded-2xl border border-white/65 bg-white/45 px-4 py-3 ${LIST_ROW_INTERACTIVE_CLASS}`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-900">{submission.title}</p>
-                  <StatusBadge
-                    label={toReadableStatus(submission.status)}
-                    tone={toStatusBadgeTone(submission.status)}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-slate-600">{new Date(submission.createdAt).toLocaleString()}</p>
-                <p className="mt-1 text-xs text-slate-600">Branch: {submission.branch || "main"}</p>
-                <p className="mt-1 text-xs text-slate-600">
-                  GitHub:{" "}
-                  <a
-                    href={submission.repoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium text-blue-700 hover:text-blue-800"
-                  >
-                    {truncateText(submission.repoUrl, 48)}
-                  </a>
-                </p>
-
-                {submission.description ? (
-                  <p className="mt-1 text-xs text-slate-600">{truncateText(submission.description, 84)}</p>
+                {submissionError ? (
+                  <p className="sm:col-span-2 text-sm font-medium text-rose-600">{submissionError}</p>
                 ) : null}
 
-                <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                <div className="pt-1 sm:col-span-2 flex items-center gap-2">
                   <button
-                    type="button"
-                    onClick={() => onEditSubmission(submission)}
-                    className={`rounded-lg border border-blue-200/80 bg-blue-50/80 px-2.5 py-1.5 font-semibold text-blue-700 ${BUTTON_INTERACTIVE_CLASS}`}
+                    type="submit"
+                    disabled={isSubmitDisabled}
+                    className={`inline-flex items-center gap-2 rounded-2xl border border-blue-200/80 bg-gradient-to-r from-blue-500/90 to-cyan-500/90 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_15px_28px_rgba(14,116,220,0.24)] transition ${
+                      isSubmitDisabled
+                        ? "cursor-not-allowed opacity-60"
+                        : "hover:translate-y-[-1px] hover:shadow-[0_18px_30px_rgba(14,116,220,0.27)]"
+                    } ${BUTTON_INTERACTIVE_CLASS}`}
                   >
-                    Edit
+                    {isSubmitting ? (
+                      <>
+                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.35)" strokeWidth="3" />
+                          <path d="M22 12a10 10 0 00-10-10" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                        </svg>
+                        {editingSubmissionId ? "Updating..." : "Submitting..."}
+                      </>
+                    ) : editingSubmissionId ? (
+                      "Update Submission"
+                    ) : (
+                      "Submit Project"
+                    )}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void onDeleteSubmission(submission.id)}
-                    className={`rounded-lg border border-rose-200/80 bg-rose-50/80 px-2.5 py-1.5 font-semibold text-rose-700 ${BUTTON_INTERACTIVE_CLASS}`}
-                  >
-                    Delete
-                  </button>
+
+                  {editingSubmissionId ? (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className={`rounded-2xl border border-white/70 bg-white/60 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white/80 ${BUTTON_INTERACTIVE_CLASS}`}
+                    >
+                      Cancel Edit
+                    </button>
+                  ) : null}
                 </div>
+              </form>
+
+              <AnimatePresence>
+                {showSuccessState ? (
+                  <motion.div
+                    className="mt-5 rounded-2xl border border-emerald-200/75 bg-emerald-50/70 px-4 py-4"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.22 }}
+                  >
+                    <h2 className="text-sm font-semibold text-emerald-800">
+                      Submission Saved
+                    </h2>
+                    <p className="mt-1 text-sm text-emerald-700">
+                      Your submission record has been saved successfully.
+                    </p>
+                    <div className="mt-3 grid gap-2 text-xs text-slate-700">
+                      <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-white/55 px-3 py-2">
+                        <span>Submission Saved</span>
+                        <StatusBadge label="Done" tone="good" />
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl border border-blue-200/70 bg-white/55 px-3 py-2">
+                        <span>Status</span>
+                        <StatusBadge label="submitted" tone="warning" />
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          </DemoGlassCard>
+        </div>
+
+        <div className="flex flex-col gap-6 lg:col-span-1">
+          <DemoGlassCard className={`p-6 ${GLASS_INTERACTIVE_CLASS}`}>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+              Preview Summary
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">Live snapshot of your current draft.</p>
+
+            <div className="mt-3 overflow-hidden rounded-xl border border-white/60 bg-white/40">
+              <div
+                className="h-1.5 bg-gradient-to-r from-blue-500/90 to-cyan-500/90 transition-all"
+                style={{ width: `${completionScore}%` }}
+              />
+            </div>
+            <p className="mt-1 text-[11px] font-medium text-slate-500">Completeness: {completionScore}%</p>
+
+            <dl className="mt-4 space-y-3 text-xs">
+              <div>
+                <dt className="font-semibold text-slate-500">Title</dt>
+                <dd className="mt-1 text-slate-800">{formState.projectTitle || "Not set"}</dd>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-slate-600">
-            No submissions yet. Your latest submissions will appear here.
-          </p>
-        )}
-      </DemoGlassCard>
+              <div>
+                <dt className="font-semibold text-slate-500">Branch</dt>
+                <dd className="mt-1 text-slate-800">{formState.branch || "Not selected"}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-500">Tech Tags</dt>
+                <dd className="mt-1 text-slate-800">{formState.techStack.length} selected</dd>
+                {formState.techStack.length ? (
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {formState.techStack.slice(0, 4).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full border border-white/65 bg-white/55 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {formState.techStack.length > 4 ? (
+                      <span className="rounded-full border border-white/65 bg-white/55 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                        +{formState.techStack.length - 4} more
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-500">GitHub Link</dt>
+                <dd className="mt-1 text-slate-800">
+                  {!formState.githubLink.trim()
+                    ? "Required"
+                    : showGithubValid
+                      ? "Valid"
+                      : "Needs correction"}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-500">Live Demo URL</dt>
+                <dd className="mt-1 text-slate-800">
+                  {!formState.liveDemoUrl.trim()
+                    ? "Optional"
+                    : !validation.liveDemoError
+                      ? "Valid"
+                      : "Needs correction"}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-500">Status</dt>
+                <dd className="mt-1">
+                  <StatusBadge label={previewStatusLabel} tone={hasRequiredFieldsOk ? "good" : "warning"} />
+                </dd>
+              </div>
+            </dl>
+          </DemoGlassCard>
+
+          <DemoGlassCard className={`h-fit p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-slate-900">Recent Submissions</h2>
+              <StatusBadge label={`${recentSubmissions.length} Showing`} tone="neutral" />
+            </div>
+
+            {submissionError ? <p className="mt-3 text-sm text-rose-600">{submissionError}</p> : null}
+
+            {isLoadingSubmissions ? (
+              <p className="mt-3 text-sm text-slate-600">Loading submissions...</p>
+            ) : recentSubmissions.length ? (
+              <div className="mt-3 grid gap-3">
+                {recentSubmissions.map((submission) => (
+                  <div
+                    key={submission.id}
+                    className={`group rounded-2xl border border-white/65 bg-white/45 px-4 py-3 ${LIST_ROW_INTERACTIVE_CLASS}`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{submission.title}</p>
+                      <StatusBadge
+                        label={toReadableStatus(submission.status)}
+                        tone={toStatusBadgeTone(submission.status)}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600">{new Date(submission.createdAt).toLocaleString()}</p>
+                    <p className="mt-1 text-xs text-slate-600">Branch: {submission.branch || "main"}</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      GitHub:{" "}
+                      <a
+                        href={submission.repoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-blue-700 hover:text-blue-800"
+                      >
+                        {truncateText(submission.repoUrl, 48)}
+                      </a>
+                    </p>
+
+                    {submission.description ? (
+                      <p className="mt-1 text-xs text-slate-600">{truncateText(submission.description, 84)}</p>
+                    ) : null}
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => onEditSubmission(submission)}
+                        className={`rounded-lg border border-blue-200/80 bg-blue-50/80 px-2.5 py-1.5 font-semibold text-blue-700 ${BUTTON_INTERACTIVE_CLASS}`}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void onDeleteSubmission(submission.id)}
+                        className={`rounded-lg border border-rose-200/80 bg-rose-50/80 px-2.5 py-1.5 font-semibold text-rose-700 ${BUTTON_INTERACTIVE_CLASS}`}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-slate-600">
+                No submissions yet. Your latest submissions will appear here.
+              </p>
+            )}
+          </DemoGlassCard>
+        </div>
+      </div>
     </motion.main>
   );
 }

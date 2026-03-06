@@ -10,7 +10,7 @@ interface PipelineStepProps {
 function statusCopy(status: PipelineStepStatus) {
   if (status === "completed") return "Completed";
   if (status === "active") return "Running";
-  return "Queued";
+  return "Pending";
 }
 
 function statusClass(status: PipelineStepStatus) {
@@ -37,8 +37,23 @@ export default function PipelineStep({ index, label, status }: PipelineStepProps
         scale: isActive ? 1.01 : 1,
       }}
       transition={{ duration: 0.22 }}
-      className={`rounded-2xl border p-3.5 transition ${statusClass(status)}`}
+      className={`relative overflow-hidden rounded-2xl border p-3.5 transition ${statusClass(status)}`}
     >
+      {isCompleted ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-200/20 via-transparent to-emerald-200/20"
+        />
+      ) : null}
+      {isActive ? (
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 w-10 bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent"
+          animate={{ x: ["-20%", "130%"] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+        />
+      ) : null}
+
       <div className="flex items-center gap-2.5">
         <span
           className={`relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${

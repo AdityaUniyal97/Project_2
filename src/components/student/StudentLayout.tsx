@@ -9,12 +9,13 @@ import { DEMO_AUTH_STORAGE_KEYS } from "./constants";
 import { logout } from "../../lib/authClient";
 import { useAuth } from "../../context/AuthContext";
 import { getAvatarImageUrl, getAvatarInitials } from "../../lib/avatar";
+import SidebarVisual, { type SidebarVisualPreset } from "./SidebarVisual";
 
 const STUDENT_NAV_ITEMS = [
   { label: "Overview", to: "/student/overview" },
   { label: "Submit Project", to: "/student/submit" },
   { label: "AI Review", to: "/student/ai-review" },
-  { label: "Live Coding Check", to: "/student/challenge" },
+  { label: "Live Coding", to: "/student/live-coding" },
   { label: "Account", to: "/student/account" },
 ];
 
@@ -28,7 +29,7 @@ function getSectionTitle(pathname: string) {
   ) {
     return "AI Review";
   }
-  if (pathname.startsWith("/student/challenge")) return "Live Coding Check";
+  if (pathname.startsWith("/student/live-coding") || pathname.startsWith("/student/challenge")) return "Live Coding";
   if (pathname.startsWith("/student/account")) return "Account";
   return "Overview";
 }
@@ -43,9 +44,24 @@ function getStudentAmbientVariant(pathname: string): AmbientVariant {
   ) {
     return "student-review";
   }
-  if (pathname.startsWith("/student/challenge")) return "student-challenge";
+  if (pathname.startsWith("/student/live-coding") || pathname.startsWith("/student/challenge")) return "student-challenge";
   if (pathname.startsWith("/student/account")) return "student-overview";
   return "student-overview";
+}
+
+function getStudentSidebarVisualPreset(pathname: string): SidebarVisualPreset {
+  if (pathname.startsWith("/student/overview")) return "overview";
+  if (pathname.startsWith("/student/submit") || pathname.startsWith("/student/submit-project")) return "submit";
+  if (
+    pathname.startsWith("/student/ai-review") ||
+    pathname.startsWith("/student/review") ||
+    pathname.startsWith("/student/analysis")
+  ) {
+    return "aiReview";
+  }
+  if (pathname.startsWith("/student/live-coding") || pathname.startsWith("/student/challenge")) return "liveCoding";
+  if (pathname.startsWith("/student/account")) return "account";
+  return "overview";
 }
 
 export default function StudentLayout() {
@@ -53,6 +69,7 @@ export default function StudentLayout() {
   const navigate = useNavigate();
   const sectionTitle = getSectionTitle(location.pathname);
   const ambientVariant = getStudentAmbientVariant(location.pathname);
+  const sidebarVisualPreset = getStudentSidebarVisualPreset(location.pathname);
   const ambientDebug = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return params.get("bgdebug") === "1" || params.get("ambient") === "1";
@@ -78,7 +95,7 @@ export default function StudentLayout() {
 
   return (
     <DemoBackground>
-      <div className="relative isolate mx-auto flex min-h-screen w-full max-w-[1380px] gap-4 px-4 py-6 sm:px-8">
+      <div className="relative isolate mx-auto flex min-h-screen w-full max-w-[1380px] gap-6 px-4 py-6 sm:px-6">
         <AmbientInnerBackground
           variant={ambientVariant}
           debug={ambientDebug}
@@ -90,49 +107,55 @@ export default function StudentLayout() {
           </div>
         ) : null}
 
-        <aside className="relative z-[2] hidden w-64 shrink-0 md:block">
-          <DemoGlassCard className={`sticky top-6 p-4 ${GLASS_INTERACTIVE_CLASS}`}>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              ProjectGuard AI
-            </p>
-            <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
-              Student
-            </p>
-            <div className="my-4 h-px bg-white/35" />
+        <aside className="relative z-[2] hidden h-[calc(100vh-3rem)] w-64 shrink-0 self-start md:block" aria-label="Student navigation">
+          <DemoGlassCard className={`sticky top-6 flex h-[calc(100vh-3rem)] flex-col p-4 ${GLASS_INTERACTIVE_CLASS}`}>
+            <div className="shrink-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                ProjectGuard AI
+              </p>
+              <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
+                Student
+              </p>
+              <div className="my-4 h-px bg-white/35" />
 
-            <nav className="space-y-2">
-              {STUDENT_NAV_ITEMS.map((item) => (
-                <NavLink key={item.to} to={item.to} end>
-                  {({ isActive }) => (
-                    <span
-                      className={`group relative flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
-                        isActive
-                          ? "border border-white/65 bg-white/70 text-slate-800 shadow-[0_10px_22px_rgba(30,64,175,0.12)]"
-                          : "border border-transparent bg-white/20 text-slate-600 hover:bg-white/45 hover:text-slate-800"
-                      }`}
-                    >
+              <nav className="space-y-2">
+                {STUDENT_NAV_ITEMS.map((item) => (
+                  <NavLink key={item.to} to={item.to} end>
+                    {({ isActive }) => (
                       <span
-                        className={`mr-2.5 h-1.5 w-1.5 rounded-full transition-all ${
+                        className={`group relative flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
                           isActive
-                            ? "bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.7)]"
-                            : "bg-slate-300 group-hover:bg-blue-300/80 group-hover:shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                            ? "border border-white/65 bg-white/70 text-slate-800 shadow-[0_10px_22px_rgba(30,64,175,0.12)]"
+                            : "border border-transparent bg-white/20 text-slate-600 hover:bg-white/45 hover:text-slate-800"
                         }`}
-                      />
-                      {item.label}
-                    </span>
-                  )}
-                </NavLink>
-              ))}
-            </nav>
+                      >
+                        <span
+                          className={`mr-2.5 h-1.5 w-1.5 rounded-full transition-all ${
+                            isActive
+                              ? "bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.7)]"
+                              : "bg-slate-300 group-hover:bg-blue-300/80 group-hover:shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                          }`}
+                        />
+                        {item.label}
+                      </span>
+                    )}
+                  </NavLink>
+                ))}
+              </nav>
 
-            <div className="my-4 h-px bg-white/35" />
-            <p className="text-[11px] text-slate-500/90">
-              Submission analytics and AI review activity
-            </p>
+              <div className="my-4 h-px bg-white/35" />
+              <p className="text-[11px] text-slate-500/90">
+                Submission analytics and AI review activity
+              </p>
+            </div>
+
+            <div className="mt-4 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/45 bg-white/20">
+              <SidebarVisual preset={sidebarVisualPreset} className="h-full w-full" />
+            </div>
           </DemoGlassCard>
         </aside>
 
-        <div className="relative z-[2] flex min-w-0 flex-1 flex-col gap-4">
+        <div className="relative z-[2] flex min-w-0 flex-1 flex-col gap-6">
           <DemoGlassCard className={`p-4 ${GLASS_INTERACTIVE_CLASS}`}>
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -174,7 +197,7 @@ export default function StudentLayout() {
               </div>
             </div>
 
-            <nav className="mt-4 flex items-center gap-2 md:hidden">
+            <nav className="mt-4 flex items-center gap-2 overflow-x-auto pb-1 md:hidden" aria-label="Student navigation">
               {STUDENT_NAV_ITEMS.map((item) => (
                 <NavLink
                   key={item.to}

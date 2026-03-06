@@ -68,6 +68,25 @@ export default function LiveCodingChallenge({ challenge }: LiveCodingChallengePr
           )}
         </div>
 
+        {/* Project Context */}
+        {(challenge.filename || challenge.function_name) && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-violet-200/80 bg-violet-100/70 px-2.5 py-0.5 text-[11px] font-semibold text-violet-700">
+              📂 From Your Project
+            </span>
+            {challenge.filename && (
+              <span className="rounded-full border border-slate-200/80 bg-white/70 px-2 py-0.5 font-mono text-[11px] text-slate-700">
+                {challenge.filename}
+              </span>
+            )}
+            {challenge.function_name && (
+              <span className="rounded-full border border-indigo-200/80 bg-indigo-50/70 px-2 py-0.5 font-mono text-[11px] text-indigo-700">
+                {challenge.function_name}()
+              </span>
+            )}
+          </div>
+        )}
+
         <p className="mt-3 text-sm leading-relaxed text-slate-700">
           {challenge.challenge_description ?? "Complete the coding challenge below."}
         </p>

@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import DemoGlassCard from "../../components/demo/DemoGlassCard";
 import { listSubmissions, type SubmissionRecord, type SubmissionStatus } from "../../lib/api";
 import {
@@ -314,7 +315,7 @@ export default function StudentOverviewPage() {
         id: "review",
         label: "Under Review",
         value: stats.underReview,
-        trend: toTrend(stats.underReview, Math.max(stats.totalSubmissions - stats.underReview, 0)),
+        trend: stats.underReview > 0 ? `${stats.underReview} active` : "None",
         tone: "amber",
         sparkline: trendValues.length ? trendValues : [0, 0, 0, 0, 0, 0],
       },
@@ -330,7 +331,7 @@ export default function StudentOverviewPage() {
         id: "rate",
         label: "Completed Rate",
         value: stats.completedRate,
-        trend: stats.totalSubmissions > 0 ? "Live" : "0%",
+        trend: stats.totalSubmissions > 0 ? `${stats.completedRate}%` : "0%",
         tone: "blue",
         sparkline: trendValues.length ? trendValues : [0, 0, 0, 0, 0, 0],
       },
@@ -367,29 +368,18 @@ export default function StudentOverviewPage() {
 
   return (
     <motion.main
-      className="mx-auto w-full max-w-5xl px-4 pb-10 sm:px-8"
+      className="w-full space-y-6"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28 }}
     >
-      <DemoGlassCard className={`p-6 sm:p-8 ${GLASS_INTERACTIVE_CLASS}`}>
-        <h2 className="text-2xl font-semibold text-slate-900 sm:text-3xl">Overview</h2>
-        <p className="mt-2 text-sm text-slate-600">Your submissions, progress, and activity.</p>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {kpiCards.map((item, index) => (
             <KpiCard key={item.id} item={item} index={index} />
           ))}
-        </div>
-      </DemoGlassCard>
+      </div>
 
-      <motion.section
-        className="mt-5"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, delay: 0.05 }}
-      >
-        <DemoGlassCard className={`p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
+      <DemoGlassCard className={`p-6 ${GLASS_INTERACTIVE_CLASS}`}>
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-base font-semibold text-slate-900">Submission History</h3>
             <button
@@ -423,7 +413,13 @@ export default function StudentOverviewPage() {
                 ) : visibleSubmissions.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-2 py-4 text-sm text-slate-600">
-                      No submissions yet. Create one from the Submit Project page.
+                      No submissions yet.{" "}
+                      <Link
+                        to="/student/submit"
+                        className="font-semibold text-blue-600 hover:underline"
+                      >
+                        Submit your first project →
+                      </Link>
                     </td>
                   </tr>
                 ) : (
@@ -447,7 +443,15 @@ export default function StudentOverviewPage() {
                             <StatusIndicator status={submission.status} />
                           </td>
                           <td className="px-2 py-2.5 text-sm font-medium text-blue-700">
-                            {truncateText(submission.repoUrl, 34)}
+                            <a
+                              href={submission.repoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {truncateText(submission.repoUrl, 34)}
+                            </a>
                           </td>
                         </tr>
                         <AnimatePresence initial={false}>
@@ -498,15 +502,9 @@ export default function StudentOverviewPage() {
             </table>
           </div>
         </DemoGlassCard>
-      </motion.section>
 
-      <motion.section
-        className="mt-5 grid gap-5 lg:grid-cols-2"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.09 }}
-      >
-        <DemoGlassCard className={`p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DemoGlassCard className={`p-6 ${GLASS_INTERACTIVE_CLASS}`}>
           <h3 className="text-base font-semibold text-slate-900">Submission Distribution</h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/65 p-3">
@@ -532,7 +530,7 @@ export default function StudentOverviewPage() {
           </div>
         </DemoGlassCard>
 
-        <DemoGlassCard className={`p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
+        <DemoGlassCard className={`p-6 ${GLASS_INTERACTIVE_CLASS}`}>
           <h3 className="text-base font-semibold text-slate-900">Submission Trend</h3>
           <p className="mt-1 text-xs text-slate-600">Last 6 months</p>
           <svg className="mt-3 w-full" viewBox={`0 0 ${svgWidth} ${svgHeight}`}>
@@ -565,15 +563,9 @@ export default function StudentOverviewPage() {
             })}
           </svg>
         </DemoGlassCard>
-      </motion.section>
+      </div>
 
-      <motion.section
-        className="mt-5"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28, delay: 0.12 }}
-      >
-        <DemoGlassCard className={`p-5 sm:p-6 ${GLASS_INTERACTIVE_CLASS}`}>
+      <DemoGlassCard className={`p-6 ${GLASS_INTERACTIVE_CLASS}`}>
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-slate-900">Submissions Per Month</h3>
             <input
@@ -582,7 +574,7 @@ export default function StudentOverviewPage() {
               className={`w-32 rounded-lg border border-white/65 bg-white/50 px-2 py-1 text-xs text-slate-600 ${INPUT_GLOW_CLASS}`}
             />
           </div>
-          <div className="mt-4 grid grid-cols-6 items-end gap-3">
+          <div className="mt-4 grid grid-cols-3 items-end gap-3 sm:grid-cols-6">
             {monthlyBars.map((bar) => (
               <div key={bar.key} className="flex flex-col items-center gap-2">
                 <div className="flex h-32 w-full items-end rounded-xl bg-white/40 p-1">
@@ -601,7 +593,6 @@ export default function StudentOverviewPage() {
             ))}
           </div>
         </DemoGlassCard>
-      </motion.section>
     </motion.main>
   );
 }
