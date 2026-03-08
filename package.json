@@ -4,17 +4,20 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\" \"npm run dev:engine\"",
     "dev:client": "vite",
     "dev:server": "npm run dev --prefix server",
+    "dev:engine": ".\\.venv\\Scripts\\python.exe -m uvicorn engine.main:app --port 8100 --reload --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "framer-motion": "^11.15.0",
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^0.577.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.3"
+    "react-router-dom": "^6.30.3",
+    "recharts": "^3.7.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.14",

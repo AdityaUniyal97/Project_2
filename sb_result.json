@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "challenge_id": "fe133cac-1681-4555-b6e1-571d3660b737",
+  "passed_tests": 3,
+  "total_tests": 3,
+  "test_results": [
+    {
+      "test_num": 1,
+      "passed": true,
+      "input": {
+        "a": 2,
+        "b": 3
+      },
+      "expected": 5,
+      "actual": 5,
+      "error": null
+    },
+    {
+      "test_num": 2,
+      "passed": true,
+      "input": {
+        "a": -1,
+        "b": 1
+      },
+      "expected": 0,
+      "actual": 0,
+      "error": null
+    },
+    {
+      "test_num": 3,
+      "passed": true,
+      "input": {
+        "a": 100,
+        "b": 200
+      },
+      "expected": 300,
+      "actual": 300,
+      "error": null
+    }
+  ],
+  "errors": null,
+  "verdict": "PASS",
+  "execution_time_ms": 129.53
+}

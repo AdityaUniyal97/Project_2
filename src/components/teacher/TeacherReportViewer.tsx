@@ -7,7 +7,7 @@ import TeacherStatusBadge from "./TeacherStatusBadge";
 import type { Submission } from "./types";
 import { BUTTON_INTERACTIVE_CLASS, INPUT_GLOW_CLASS } from "../ui/glass";
 
-type ReportViewerTab = "summary" | "evidence" | "viva" | "evaluation" | "live-demo";
+type ReportViewerTab = "summary" | "evidence" | "viva" | "evaluation" | "live-demo" | "consciousness" | "live-coding";
 type DemoViewport = "desktop" | "tablet" | "mobile";
 
 interface TeacherReportViewerProps {
@@ -23,6 +23,8 @@ const TABS: Array<{ id: ReportViewerTab; label: string }> = [
   { id: "viva", label: "Viva Pack" },
   { id: "evaluation", label: "Evaluation" },
   { id: "live-demo", label: "Live Demo" },
+  { id: "consciousness", label: "Consciousness Timeline" },
+  { id: "live-coding", label: "Live Coding Arena" },
 ];
 
 const DECISION_BUTTONS: ReportDecision[] = ["Accept", "Needs Viva", "Flag"];
@@ -62,6 +64,10 @@ function scoreTile(label: string, value: string, tone: "slate" | "blue" | "amber
   );
 }
 
+import ConsciousnessTimeline from "../../components/ConsciousnessTimeline";
+import AdversarialTribunal from "../../components/teacher/AdversarialTribunal";
+import LiveCodingArena from "../../components/teacher/LiveCodingArena";
+
 export default function TeacherReportViewer({
   open,
   submission,
@@ -92,6 +98,10 @@ export default function TeacherReportViewer({
   const [isFrameLoading, setIsFrameLoading] = useState(false);
   const [frameBlocked, setFrameBlocked] = useState(false);
 
+  const [consciousnessData, setConsciousnessData] = useState<any>(null);
+  const [isConsciousnessLoading, setIsConsciousnessLoading] = useState(false);
+  const [consciousnessError, setConsciousnessError] = useState<string | null>(null);
+
   const activeId = submission?.id ?? "";
 
   useEffect(() => {
@@ -119,6 +129,29 @@ export default function TeacherReportViewer({
 
     return () => window.clearTimeout(timeout);
   }, [activeTab, frameKey, open, submission]);
+
+  useEffect(() => {
+    if (activeTab === "consciousness" && open && submission && !consciousnessData && !isConsciousnessLoading && !consciousnessError) {
+      setIsConsciousnessLoading(true);
+      fetch("http://localhost:8100/api/consciousness/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Use the github repo url, if empty fallback
+        body: JSON.stringify({ github_url: submission.githubUrl || "https://github.com/AdityaUniyal97/Bus-Tracking-app" }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.error) throw new Error(data.error);
+          setConsciousnessData(data);
+          setIsConsciousnessLoading(false);
+        })
+        .catch((err) => {
+          setConsciousnessError(err.message);
+          setIsConsciousnessLoading(false);
+          console.error("Consciousness failed: ", err);
+        });
+    }
+  }, [activeTab, open, submission, consciousnessData, isConsciousnessLoading, consciousnessError]);
 
   useEffect(() => {
     if (!open) {
@@ -240,11 +273,10 @@ export default function TeacherReportViewer({
                   updateVivaStatus(activeId, "Pending");
                 }
               }}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                active
-                  ? "border-blue-300/90 bg-blue-100/85 text-blue-800"
-                  : "border-white/65 bg-white/65 text-slate-700 hover:bg-white/85"
-              } ${BUTTON_INTERACTIVE_CLASS}`}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${active
+                ? "border-blue-300/90 bg-blue-100/85 text-blue-800"
+                : "border-white/65 bg-white/65 text-slate-700 hover:bg-white/85"
+                } ${BUTTON_INTERACTIVE_CLASS}`}
             >
               {decision}
             </button>
@@ -298,111 +330,7 @@ export default function TeacherReportViewer({
 
   const renderVivaTab = () => (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Viva Questions</p>
-        <button
-          type="button"
-          onClick={onCopyVivaPack}
-          className={`rounded-lg border border-white/65 bg-white/65 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white/85 ${BUTTON_INTERACTIVE_CLASS}`}
-        >
-          Copy pack
-        </button>
-      </div>
-
-      {submission.aiViva.length > 0 ? (
-        <div className="space-y-2">
-          {submission.aiViva.map((q, i) => {
-            const qId = `${activeId}-v${i + 1}`;
-            const state = vivaEntry?.questions[qId];
-            return (
-              <div key={qId} className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-slate-800">{i + 1}. {q}</p>
-                </div>
-                <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(state?.asked)}
-                    onChange={() => toggleQuestionAsked(activeId, qId)}
-                  />
-                  Asked
-                </label>
-                <textarea
-                  value={state?.notes ?? ""}
-                  onChange={(event) => setQuestionNotes(activeId, qId, event.target.value)}
-                  placeholder="Notes for this question"
-                  className={`mt-2 h-16 w-full resize-none rounded-lg border border-white/65 bg-white/70 px-2.5 py-2 text-xs text-slate-700 outline-none ${INPUT_GLOW_CLASS}`}
-                />
-              </div>
-            );
-          })}
-        </div>
-      ) : groupedViva.length > 0 ? (
-        groupedViva.map(([topic, questions]) => {
-          const expanded = expandedTopic === topic;
-          return (
-            <div key={topic} className="overflow-hidden rounded-xl border border-white/60 bg-white/45">
-              <button
-                type="button"
-                onClick={() => setExpandedTopic((current) => (current === topic ? null : topic))}
-                className="flex w-full items-center justify-between px-3 py-2 text-left"
-              >
-                <span className="text-sm font-semibold text-slate-800">{topic}</span>
-                <span className="text-xs text-slate-500">{expanded ? "Hide" : "Open"}</span>
-              </button>
-              <AnimatePresence initial={false}>
-                {expanded ? (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden border-t border-white/50 px-3 py-3"
-                  >
-                    <div className="space-y-3">
-                      {questions.map((question) => {
-                        const state = vivaEntry?.questions[question.id];
-                        return (
-                          <div key={question.id} className="rounded-lg border border-white/65 bg-white/60 px-3 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium text-slate-800">{question.question}</p>
-                              <span className="text-[11px] font-semibold text-slate-500">
-                                {question.difficulty}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs text-slate-600">{question.expectedTalkingPoints}</p>
-
-                            <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
-                              <input
-                                type="checkbox"
-                                checked={Boolean(state?.asked)}
-                                onChange={() => toggleQuestionAsked(activeId, question.id)}
-                              />
-                              Asked
-                            </label>
-
-                            <textarea
-                              value={state?.notes ?? ""}
-                              onChange={(event) =>
-                                setQuestionNotes(activeId, question.id, event.target.value)
-                              }
-                              placeholder="Notes for this question"
-                              className={`mt-2 h-16 w-full resize-none rounded-lg border border-white/65 bg-white/70 px-2.5 py-2 text-xs text-slate-700 outline-none ${INPUT_GLOW_CLASS}`}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
-            </div>
-          );
-        })
-      ) : (
-        <div className="rounded-xl border border-white/60 bg-white/45 px-4 py-5 text-center text-sm text-slate-600">
-          No viva questions available. Run AI review first.
-        </div>
-      )}
+      <AdversarialTribunal submissionId={activeId} consciousnessData={consciousnessData} />
     </div>
   );
 
@@ -496,9 +424,8 @@ export default function TeacherReportViewer({
                 key={mode}
                 type="button"
                 onClick={() => setViewport(mode)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-                  viewport === mode ? "bg-white text-slate-800 shadow" : "text-slate-500"
-                }`}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${viewport === mode ? "bg-white text-slate-800 shadow" : "text-slate-500"
+                  }`}
               >
                 {mode[0].toUpperCase() + mode.slice(1)}
               </button>
@@ -555,6 +482,34 @@ export default function TeacherReportViewer({
     );
   };
 
+  const renderConsciousnessTab = () => {
+    if (isConsciousnessLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center p-12 text-slate-500 rounded-xl border border-white/60 bg-[#0B0F19] h-[500px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mb-4"></div>
+          <p className="text-sm font-semibold text-cyan-400 animate-pulse">Running Quantum Commit Archaeology...</p>
+          <p className="text-xs text-slate-500 mt-2 text-center max-w-sm">This performs a 1M context pull out of the developer's entire git history. This may take up to 60-120 seconds for deep architectures...</p>
+        </div>
+      );
+    }
+    if (consciousnessError) {
+      return (
+        <div className="rounded-xl border border-red-500/50 bg-red-500/10 p-5 text-center text-sm text-red-500">
+          <p className="font-bold mb-2">Consciousness Engine Failure</p>
+          {consciousnessError}
+        </div>
+      );
+    }
+    if (consciousnessData?.timeline_data) {
+      return <ConsciousnessTimeline data={consciousnessData.timeline_data} studentName={submission.studentName} />;
+    }
+    return (
+      <div className="rounded-xl border border-white/60 bg-white/45 px-4 py-5 text-center text-sm text-slate-600">
+        Click to initiate Consciousness Scan
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -575,6 +530,12 @@ export default function TeacherReportViewer({
     if (activeTab === "evidence") return renderEvidenceTab();
     if (activeTab === "viva") return renderVivaTab();
     if (activeTab === "evaluation") return renderEvaluationTab();
+    if (activeTab === "consciousness") return renderConsciousnessTab();
+    if (activeTab === "live-coding") return (
+      <div className="space-y-3">
+        <LiveCodingArena submissionId={activeId} riskScores={submission} />
+      </div>
+    );
     return renderLiveDemoTab();
   };
 
@@ -624,11 +585,10 @@ export default function TeacherReportViewer({
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                      activeTab === tab.id
-                        ? "border-blue-200/90 bg-blue-50/80 text-blue-700"
-                        : "border-white/65 bg-white/65 text-slate-600 hover:bg-white/85"
-                    } ${BUTTON_INTERACTIVE_CLASS}`}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${activeTab === tab.id
+                      ? "border-blue-200/90 bg-blue-50/80 text-blue-700"
+                      : "border-white/65 bg-white/65 text-slate-600 hover:bg-white/85"
+                      } ${BUTTON_INTERACTIVE_CLASS}`}
                   >
                     {tab.label}
                   </button>

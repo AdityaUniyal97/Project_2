@@ -1,0 +1,21 @@
+﻿==================================================
+TEST 1: Correct add() => should PASS
+==================================================
+  Verdict: ERROR
+  Passed: 0/3
+  Time: 0ms
+  Errors: 
+
+==================================================
+TEST 2: Wrong multiply() => should FAIL
+==================================================
+  Verdict: ERROR
+  Passed: 0/2
+
+==================================================
+TEST 3: os.system attack => should ERROR
+==================================================
+  Verdict: ERROR
+  Errors: Security violation: os.system calls are not allowed
+
+All tests complete!

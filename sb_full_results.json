@@ -1,0 +1,98 @@
+[
+  {
+    "test": "correct_add_PASS",
+    "result": {
+      "success": true,
+      "challenge_id": "56c8893b-6765-46c1-9ce7-10e8a5a6aa53",
+      "passed_tests": 3,
+      "total_tests": 3,
+      "test_results": [
+        {
+          "test_num": 1,
+          "passed": true,
+          "input": {
+            "a": 2,
+            "b": 3
+          },
+          "expected": 5,
+          "actual": 5,
+          "error": null
+        },
+        {
+          "test_num": 2,
+          "passed": true,
+          "input": {
+            "a": -1,
+            "b": 1
+          },
+          "expected": 0,
+          "actual": 0,
+          "error": null
+        },
+        {
+          "test_num": 3,
+          "passed": true,
+          "input": {
+            "a": 0,
+            "b": 0
+          },
+          "expected": 0,
+          "actual": 0,
+          "error": null
+        }
+      ],
+      "errors": null,
+      "verdict": "PASS",
+      "execution_time_ms": 136.59
+    }
+  },
+  {
+    "test": "wrong_impl_FAIL",
+    "result": {
+      "success": true,
+      "challenge_id": "da0a21d0-6203-498d-8d2f-f6f27a1551bf",
+      "passed_tests": 1,
+      "total_tests": 2,
+      "test_results": [
+        {
+          "test_num": 1,
+          "passed": false,
+          "input": {
+            "a": 2,
+            "b": 3
+          },
+          "expected": 5,
+          "actual": 6,
+          "error": null
+        },
+        {
+          "test_num": 2,
+          "passed": true,
+          "input": {
+            "a": 0,
+            "b": 0
+          },
+          "expected": 0,
+          "actual": 0,
+          "error": null
+        }
+      ],
+      "errors": null,
+      "verdict": "FAIL",
+      "execution_time_ms": 116.65
+    }
+  },
+  {
+    "test": "security_ERROR",
+    "result": {
+      "success": false,
+      "challenge_id": "d68cfd82-c484-4678-b6cf-21b9e05b0062",
+      "passed_tests": 0,
+      "total_tests": 1,
+      "execution_time_ms": 0,
+      "test_results": [],
+      "errors": "Security violation: os.system calls are not allowed",
+      "verdict": "ERROR"
+    }
+  }
+]

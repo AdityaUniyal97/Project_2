@@ -171,9 +171,9 @@ export default function StudentReviewPage() {
         current.map((item) =>
           item.id === submissionId
             ? {
-                ...item,
-                status: normalizedStatus,
-              }
+              ...item,
+              status: normalizedStatus,
+            }
             : item,
         ),
       );
@@ -225,9 +225,9 @@ export default function StudentReviewPage() {
         current.map((item) =>
           item.id === submissionId
             ? {
-                ...item,
-                status: normalizedStatus,
-              }
+              ...item,
+              status: normalizedStatus,
+            }
             : item,
         ),
       );
@@ -471,11 +471,10 @@ export default function StudentReviewPage() {
                   key={submission.id}
                   type="button"
                   onClick={() => setSelectedSubmissionId(submission.id)}
-                  className={`flex h-full flex-col rounded-2xl border px-4 py-3 text-left transition ${
-                    isSelected
+                  className={`flex h-full flex-col rounded-2xl border px-4 py-3 text-left transition ${isSelected
                       ? "border-blue-200/80 bg-blue-50/70"
                       : "border-white/65 bg-white/45 hover:bg-white/65"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900">{submission.title}</p>
@@ -654,13 +653,12 @@ function ProcessingProgressBar({
               return (
                 <div key={step.id} className="relative">
                   <span
-                    className={`inline-flex h-3.5 w-3.5 rounded-full border ${
-                      isCompletedStep
+                    className={`inline-flex h-3.5 w-3.5 rounded-full border ${isCompletedStep
                         ? "border-emerald-300/90 bg-emerald-300/85"
                         : isActiveStep
                           ? "border-cyan-300/90 bg-cyan-300/90"
                           : "border-slate-300/80 bg-white/80"
-                    }`}
+                      }`}
                   />
                   {isActiveStep ? (
                     <motion.span
@@ -686,13 +684,12 @@ function ProcessingProgressBar({
                     {step.label}
                   </p>
                   <p
-                    className={`mt-0.5 text-[10px] font-semibold ${
-                      isCompletedStep
+                    className={`mt-0.5 text-[10px] font-semibold ${isCompletedStep
                         ? "text-emerald-700"
                         : isActiveStep
                           ? "text-blue-700"
                           : "text-slate-500"
-                    }`}
+                      }`}
                   >
                     {isCompletedStep ? "Completed" : isActiveStep ? "Running" : "Pending"}
                   </p>
@@ -771,8 +768,29 @@ function AiResultsPanel({ data }: { data: ReviewStatusData }) {
   const codeQuality = typeof evidence?.code_quality_score === "number" ? evidence.code_quality_score : null;
   const aiDetection = typeof evidence?.ai_detection_probability === "number" ? evidence.ai_detection_probability : null;
 
+  const showLiveCodingAlert = (similarityScore !== null && similarityScore > 0.6) || (aiDetection !== null && aiDetection > 0.7);
+
   return (
     <div className="space-y-6">
+      {/* Verification Alert */}
+      {showLiveCodingAlert && (
+        <div className="rounded-2xl border-2 border-amber-400/80 bg-amber-50/90 p-6 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
+          <h3 className="text-lg font-bold text-amber-900 flex items-center gap-2">
+            <span className="text-xl">⚠️</span> Authorship Verification Required
+          </h3>
+          <p className="mt-2 text-sm text-amber-800">
+            Our analysis detected patterns requiring additional verification.
+            Complete live coding challenges to confirm authorship.
+          </p>
+          <button
+            onClick={() => navigate('/student/live-coding')}
+            className="mt-4 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all text-sm flex items-center gap-2 hover:scale-105"
+          >
+            Start Verification Challenges
+          </button>
+        </div>
+      )}
+
       {/* Header: Score Circle + Risk Level */}
       <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-white/70 via-white/50 to-slate-50/40 p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
